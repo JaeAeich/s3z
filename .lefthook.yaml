@@ -1,0 +1,34 @@
+pre-commit:
+  parallel: true
+  commands:
+    editorconfig:
+      run: mise x -- eclint fix {staged_files}
+      stage_fixed: true
+
+    toml-hygiene:
+      glob: "{*.toml,**/*.toml}"
+      run: >
+        mise x -- toml-sort --in-place --all --trailing-comma-inline-array {staged_files}
+        && mise x -- taplo format {staged_files}
+      stage_fixed: true
+
+    markdownlint:
+      glob: "**/*.md"
+      run: mise x -- markdownlint --fix {staged_files}
+      stage_fixed: true
+
+    rustfmt:
+      glob: "**/*.rs"
+      run: cargo +nightly fmt -- {staged_files}
+      stage_fixed: true
+
+    clippy:
+      glob: "**/*.rs"
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+commit-msg:
+  commands:
+    commitlint:
+      run: >
+        NODE_PATH="$(mise where 'npm:@commitlint/config-conventional')/lib/node_modules"
+        "$(mise where 'npm:@commitlint/cli')/bin/commitlint" --edit {1}

@@ -1,0 +1,9 @@
+[tools]
+"lefthook" = "latest"
+"npm:@commitlint/cli" = "latest"
+"npm:@commitlint/config-conventional" = "latest"
+"npm:eclint" = "latest"
+"npm:markdownlint-cli" = "latest"
+"pipx:toml-sort" = "latest"
+rust = "latest"
+taplo = "latest"
