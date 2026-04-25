@@ -1,0 +1,26 @@
+[dependencies]
+aws-credential-types = { workspace = true }
+aws-sigv4 = { workspace = true }
+bytes = { workspace = true }
+http = { workspace = true }
+percent-encoding = { workspace = true }
+quick-xml = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+walkdir = { workspace = true }
+
+[lints]
+workspace = true
+
+[package]
+description = "S3 ops, but fearlessly fast!"
+name = "s3z"
+readme = "../../README.md"
+version = "0.1.0"
+categories.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true

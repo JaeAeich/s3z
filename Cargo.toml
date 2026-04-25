@@ -1,7 +1,13 @@
-[dependencies]
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1"
 aws-credential-types = { features = ["hardcoded-credentials"], version = "1" }
 aws-sigv4 = { features = ["sign-http"], version = "1" }
 bytes = "1"
+clap = { features = ["derive", "env"], version = "4" }
 http = "1"
 percent-encoding = "2"
 quick-xml = { features = ["serialize"], version = "0.37" }
@@ -19,7 +25,7 @@ tokio = { features = [
 ], version = "1" }
 walkdir = "2"
 
-[lints.clippy]
+[workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
 blanket_clippy_restriction_lints = "allow"
 cargo = { level = "deny", priority = -1 }
@@ -37,7 +43,7 @@ separated_literal_suffix = "allow"
 single_call_fn = "allow"
 std_instead_of_alloc = "allow"
 
-[lints.rust]
+[workspace.lints.rust]
 elided_lifetimes_in_paths = "deny"
 keyword_idents = { level = "forbid", priority = -1 }
 let_underscore_drop = "deny"
@@ -59,13 +65,9 @@ unused_macro_rules = "deny"
 unused_qualifications = "deny"
 variant_size_differences = "deny"
 
-[package]
+[workspace.package]
 categories = ["asynchronous", "network-programming", "web-programming"]
-description = "S3 ops, but fearlessly fast!"
 edition = "2024"
 keywords = ["aws", "cloud", "multithread", "s3", "storage"]
 license = "MIT"
-name = "s3z"
-readme = "README.md"
 repository = "github.com/jaeaeich/s3z"
-version = "0.1.0"
