@@ -24,6 +24,9 @@ class McTool:
             f"bench_{backend.name}/{params.bucket}/{params.prefix}",
         ]
 
+    def env(self, backend: Backend) -> dict[str, str]:
+        return {"AWS_REGION": backend.region, "AWS_DEFAULT_REGION": backend.region}
+
     def setup(self, backends: list[Backend]) -> None:
         access_key = os.environ["AWS_ACCESS_KEY_ID"]
         secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]

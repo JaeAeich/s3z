@@ -36,14 +36,14 @@ class Profile:
 PROFILES: dict[str, Profile] = {
     "dev": Profile(
         name="dev",
-        backends=("minio",),
-        tools=("s3z", "s5cmd", "mc"),
+        backends=("minio", "rustfs", "seaweedfs", "garage"),
+        tools=("s3z",),
         file_count=3,
         file_size_mb=128,
         workers=32,
-        concurrency=4,
+        concurrency=8,
         min_runs=8,
-        max_runs=20,
+        max_runs=30,
         target_rel_ci=0.05,
         warmup_runs=1,
     ),

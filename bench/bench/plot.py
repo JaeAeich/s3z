@@ -51,6 +51,8 @@ class PlotRow:
     ci95_half: float
     rss_mb: float
     total_mb: str
+    workers: str = "?"
+    concurrency: str = "?"
 
 
 def load_run(source: str = "saved") -> tuple[Path, RunMeta]:
@@ -162,7 +164,10 @@ def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str) -> None:
     )
 
     machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
-    note = "s3z & s5cmd: 32w × 4c configurable  //  mc & aws: tool defaults (no equivalent flags)"
+    w, c = rows[0].workers, rows[0].concurrency
+    note = (
+        f"s3z & s5cmd: {w}w × {c}c configurable  //  mc & aws: tool defaults (no equivalent flags)"
+    )
     fig.text(
         0.5,
         0.01,
@@ -202,6 +207,8 @@ def _read_csv(path: Path) -> list[PlotRow]:
                     ci95_half=float(row.get("ci95_half_s") or 0),
                     rss_mb=float(row.get("peak_rss_mb") or 0),
                     total_mb=row.get("total_mb", "?") or "?",
+                    workers=row.get("workers", "?") or "?",
+                    concurrency=row.get("concurrency", "?") or "?",
                 )
             )
     return rows
