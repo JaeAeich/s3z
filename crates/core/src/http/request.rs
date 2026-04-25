@@ -16,7 +16,12 @@ use crate::{
 pub(crate) fn build_signed(
     method: Method, uri: Uri, body: Bytes, creds: &Credentials, region: &str,
 ) -> Result<Request<Bytes>> {
-    let mut req = Request::builder().method(method).uri(uri).body(body)?;
+    let content_length = body.len();
+    let mut req = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-length", content_length)
+        .body(body)?;
 
     auth::sign_request(&mut req, creds, region, false)?;
     Ok(req)

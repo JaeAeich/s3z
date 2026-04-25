@@ -53,8 +53,7 @@ pub(crate) fn sign_request(
     let signable_body = if unsigned_payload {
         SignableBody::UnsignedPayload
     } else {
-        let body = request.body();
-        if body.is_empty() { SignableBody::UnsignedPayload } else { SignableBody::Bytes(body) }
+        SignableBody::Bytes(request.body())
     };
 
     let headers: Vec<(&str, &str)> = request
