@@ -45,6 +45,7 @@ pub mod config;
 pub mod error;
 mod http;
 pub mod ops;
+pub(crate) mod trace;
 mod transfer;
 
 pub use client::S3Client;

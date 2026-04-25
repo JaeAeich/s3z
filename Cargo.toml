@@ -24,6 +24,8 @@ tokio = { features = [
   "rt-multi-thread",
   "sync",
 ], version = "1" }
+tracing = "0.1"
+tracing-subscriber = { features = ["env-filter", "fmt"], version = "0.3" }
 walkdir = "2"
 
 [workspace.lints.clippy]

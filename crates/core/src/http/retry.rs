@@ -7,6 +7,7 @@ use crate::{
     config::RetryPolicy,
     error::{Error, Result},
     http::response,
+    trace::{maybe_debug, maybe_warn},
 };
 
 /// Classify a response and either return it or extract a retryable error.
@@ -22,13 +23,13 @@ async fn classify(resp: reqwest::Response) -> Outcome {
     }
     if resp.status().is_server_error() || resp.status() == http::StatusCode::TOO_MANY_REQUESTS {
         let status = resp.status();
-        let body_text = resp.text().await.unwrap_or_default();
+        let body_text = resp.text().await.unwrap_or_else(|e| format!("<body read failed: {e}>"));
         return Outcome::Retryable(Error::S3 {
             code: status.to_string(),
             message: body_text,
         });
     }
-    let body_text = resp.text().await.unwrap_or_default();
+    let body_text = resp.text().await.unwrap_or_else(|e| format!("<body read failed: {e}>"));
     Outcome::Fatal(response::parse_error(&body_text))
 }
 
@@ -79,20 +80,44 @@ async fn send_retry_loop(
             .body(body.clone())
             .build()?;
 
+        maybe_debug!(%method, %uri, attempt, "sending request");
+
+        #[cfg(feature = "tracing")]
+        let start = std::time::Instant::now();
+
         match http.execute(reqwest_req).await {
             Ok(resp) => {
+                #[cfg(feature = "tracing")]
+                let elapsed = start.elapsed();
+
                 match classify(resp).await {
-                    Outcome::Success(r) => return Ok(r),
-                    Outcome::Retryable(e) => last_err = Some(e),
-                    Outcome::Fatal(e) => return Err(e),
+                    Outcome::Success(r) => {
+                        maybe_debug!(%method, %uri, ?elapsed, status = %r.status(), "request ok");
+                        return Ok(r);
+                    },
+                    Outcome::Retryable(e) => {
+                        maybe_warn!(
+                            %method, %uri, ?elapsed, attempt, error = %e, "retryable error"
+                        );
+                        last_err = Some(e);
+                    },
+                    Outcome::Fatal(e) => {
+                        maybe_warn!(%method, %uri, ?elapsed, error = %e, "fatal error");
+                        return Err(e);
+                    },
                 }
             },
             Err(e) => {
+                #[cfg(feature = "tracing")]
+                let elapsed = start.elapsed();
+
+                maybe_warn!(%method, %uri, ?elapsed, attempt, error = %e, "transport error");
                 last_err = Some(Error::Http(e));
             },
         }
 
         if attempt.saturating_add(1) < attempts {
+            maybe_debug!(?delay, "backing off");
             sleep(delay).await;
             delay = delay.saturating_mul(2).min(policy.max_delay);
         }

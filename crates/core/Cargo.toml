@@ -9,7 +9,12 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tracing = { optional = true, workspace = true }
 walkdir = { workspace = true }
+
+[features]
+default = []
+tracing = ["dep:tracing"]
 
 [lints]
 workspace = true

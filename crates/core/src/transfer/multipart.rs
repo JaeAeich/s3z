@@ -6,13 +6,14 @@
 //! as backpressure — peak memory is `concurrency * part_size`.
 
 use core::fmt::Write as _;
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use bytes::Bytes;
 use http::{Method, Uri};
 use tokio::{
     fs::File,
     io::AsyncReadExt as _,
+    runtime::Handle,
     sync::mpsc,
     task::{self, JoinSet},
 };
@@ -27,11 +28,11 @@ use crate::{
         response,
         retry::{send_with_retry, send_with_retry_bytes},
     },
+    trace::{maybe_debug, maybe_info},
     transfer::part::{Part, PartResult},
 };
 
 /// Context for a single multipart upload.
-#[derive(Clone)]
 struct UploadCtx {
     bucket: String,
     config: Config,
@@ -50,7 +51,7 @@ struct ReadyPart {
 
 /// Drop guard that aborts the multipart upload on S3 if not disarmed.
 struct AbortGuard {
-    ctx: Option<UploadCtx>,
+    ctx: Option<Arc<UploadCtx>>,
 }
 
 impl AbortGuard {
@@ -58,7 +59,7 @@ impl AbortGuard {
         self.ctx = None;
     }
 
-    const fn new(ctx: UploadCtx) -> Self {
+    const fn new(ctx: Arc<UploadCtx>) -> Self {
         Self {
             ctx: Some(ctx),
         }
@@ -68,7 +69,10 @@ impl AbortGuard {
 impl Drop for AbortGuard {
     fn drop(&mut self) {
         if let Some(ctx) = self.ctx.take() {
-            drop(task::spawn(async move {
+            let Ok(handle) = Handle::try_current() else {
+                return;
+            };
+            drop(handle.spawn(async move {
                 drop(
                     abort(
                         &ctx.http,
@@ -147,26 +151,50 @@ pub(crate) async fn upload_multipart(
     http: &reqwest::Client, config: &Config, creds: &Credentials, bucket: &str, key: &ObjectKey,
     parts: &[Part], file_path: &Path, concurrency: usize,
 ) -> Result<(String, u32)> {
-    let uid = initiate(http, config, creds, bucket, key).await?;
+    #[cfg(feature = "tracing")]
+    let start = std::time::Instant::now();
 
-    let ctx = UploadCtx {
+    let uid = initiate(http, config, creds, bucket, key).await?;
+    maybe_info!(
+        key = %key, upload_id = %uid, parts = parts.len(), concurrency, "multipart initiated"
+    );
+
+    let ctx = Arc::new(UploadCtx {
         bucket: bucket.to_owned(),
         config: config.clone(),
         creds: creds.clone(),
         http: http.clone(),
         key: key.clone(),
         upload_id: uid.clone(),
-    };
+    });
 
-    let mut guard = AbortGuard::new(ctx.clone());
+    let mut guard = AbortGuard::new(Arc::clone(&ctx));
     let result = upload_all_parts(&ctx, parts, file_path, concurrency).await;
 
     match result {
         Ok(mut results) => {
+            #[cfg(feature = "tracing")]
+            let complete_start = std::time::Instant::now();
+
             let etag = complete(http, config, creds, bucket, key, &uid, &mut results).await?;
+
+            #[cfg(feature = "tracing")]
+            let complete_elapsed = complete_start.elapsed();
+
             let parts_count =
                 u32::try_from(results.len()).map_err(|e| Error::Conversion(e.to_string()))?;
             guard.disarm();
+
+            #[cfg(feature = "tracing")]
+            let total_elapsed = start.elapsed();
+
+            maybe_info!(
+                key = %key,
+                parts = parts_count,
+                ?complete_elapsed,
+                ?total_elapsed,
+                "multipart complete"
+            );
             Ok((etag, parts_count))
         },
         Err(e) => Err(e),
@@ -182,7 +210,7 @@ pub(crate) async fn upload_multipart(
 /// - Bounded channel (capacity = concurrency) acts as backpressure
 /// - Peak memory: `concurrency * part_size`
 async fn upload_all_parts(
-    ctx: &UploadCtx, parts: &[Part], file_path: &Path, concurrency: usize,
+    ctx: &Arc<UploadCtx>, parts: &[Part], file_path: &Path, concurrency: usize,
 ) -> Result<Vec<PartResult>> {
     let (tx, rx) = mpsc::channel::<ReadyPart>(concurrency);
 
@@ -227,7 +255,7 @@ async fn read_parts(parts: Vec<Part>, file_path: &Path, tx: mpsc::Sender<ReadyPa
 
 /// Spawn N upload workers, collect results.
 async fn run_upload_workers(
-    ctx: &UploadCtx, mut rx: mpsc::Receiver<ReadyPart>, concurrency: usize, total_parts: usize,
+    ctx: &Arc<UploadCtx>, mut rx: mpsc::Receiver<ReadyPart>, concurrency: usize, total_parts: usize,
 ) -> Result<Vec<PartResult>> {
     let mut set = JoinSet::new();
     let mut results = Vec::with_capacity(total_parts);
@@ -236,7 +264,7 @@ async fn run_upload_workers(
     while spawned < concurrency {
         match rx.recv().await {
             Some(ready) => {
-                let c = ctx.clone();
+                let c = Arc::clone(ctx);
                 set.spawn(async move { upload_part_from_buffer(&c, ready).await });
                 spawned = spawned.saturating_add(1);
             },
@@ -263,7 +291,7 @@ async fn run_upload_workers(
         }
 
         if let Ok(ready) = rx.try_recv() {
-            let c = ctx.clone();
+            let c = Arc::clone(ctx);
             set.spawn(async move { upload_part_from_buffer(&c, ready).await });
         }
     }
@@ -283,6 +311,11 @@ async fn upload_part_from_buffer(ctx: &UploadCtx, ready: ReadyPart) -> Result<Pa
     )
     .parse()?;
 
+    maybe_debug!(key = %ctx.key, part_number, size = ready.size, "uploading part");
+
+    #[cfg(feature = "tracing")]
+    let part_start = std::time::Instant::now();
+
     let req = build_signed_unsigned_payload(
         Method::PUT,
         uri,
@@ -291,6 +324,11 @@ async fn upload_part_from_buffer(ctx: &UploadCtx, ready: ReadyPart) -> Result<Pa
         &ctx.config.region,
     )?;
     let resp = send_with_retry_bytes(&ctx.http, req, ready.data, &ctx.config.retry).await?;
+
+    #[cfg(feature = "tracing")]
+    let part_elapsed = part_start.elapsed();
+
+    maybe_debug!(key = %ctx.key, part_number, ?part_elapsed, "part uploaded");
 
     let etag = resp
         .headers()

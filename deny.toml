@@ -1,0 +1,42 @@
+# cargo-deny configuration — https://embarkstudios.github.io/cargo-deny/
+#
+# Run: cargo deny check
+
+[advisories]
+ignore = []
+version = 2
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"        # path deps in workspace use wildcards
+
+[graph]
+all-features = true
+targets = []
+
+[licenses]
+allow = [
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+version = 2
+
+[[licenses.clarify]]
+expression = "Apache-2.0 AND ISC"
+license-files = [{ hash = 0xbd0eed23, path = "LICENSE" }]
+name = "ring"
+
+[sources]
+allow-git = []
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+unknown-git = "deny"
+unknown-registry = "deny"

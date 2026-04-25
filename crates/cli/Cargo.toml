@@ -8,6 +8,11 @@ clap = { workspace = true }
 indicatif = { workspace = true }
 s3z = { path = "../core" }
 tokio = { workspace = true }
+tracing-subscriber = { optional = true, workspace = true }
+
+[features]
+default = []
+tracing = ["dep:tracing-subscriber", "s3z/tracing"]
 
 [lints]
 workspace = true

@@ -17,6 +17,7 @@ use crate::{
     config::Config,
     error::{Error, Result},
     http::{ObjectKey, request::build_signed, retry::send_with_retry},
+    trace::{maybe_debug, maybe_info},
     transfer::{multipart, scheduler},
 };
 
@@ -147,6 +148,14 @@ impl S3Client {
         let creds = self.creds.clone();
         let entries = expand_sources(&req.sources, &req.dest_prefix)?;
         let total = entries.len();
+        maybe_info!(
+            files = total,
+            workers = req.workers,
+            concurrency = req.concurrency_per_file,
+            bucket = %req.dest_bucket,
+            prefix = %req.dest_prefix,
+            "starting upload batch"
+        );
 
         let mut set = JoinSet::new();
         let mut entries_iter = entries.into_iter();
@@ -284,9 +293,18 @@ async fn upload_single_file(
     let metadata = fs::metadata(path).await?;
     let size = metadata.len();
 
+    #[cfg(feature = "tracing")]
+    let file_start = std::time::Instant::now();
+
     if size <= config.transfer.multipart_threshold {
+        maybe_debug!(key = %key, size, "single PUT");
         let body = fs::read(path).await?;
         let (etag, parts) = single_put(http, config, creds, bucket, key, body).await?;
+
+        #[cfg(feature = "tracing")]
+        let elapsed = file_start.elapsed();
+
+        maybe_info!(key = %key, size, ?elapsed, "file uploaded (single PUT)");
         Ok(FileUploadResult {
             etag,
             key: key.raw().to_owned(),
@@ -295,6 +313,7 @@ async fn upload_single_file(
             source: path.to_owned(),
         })
     } else {
+        maybe_debug!(key = %key, size, "multipart upload");
         let parts_plan = scheduler::plan_parts(size, &config.transfer);
         let (etag, parts_count) = multipart::upload_multipart(
             http,
@@ -307,6 +326,11 @@ async fn upload_single_file(
             concurrency,
         )
         .await?;
+
+        #[cfg(feature = "tracing")]
+        let elapsed = file_start.elapsed();
+
+        maybe_info!(key = %key, size, parts = parts_count, ?elapsed, "file uploaded (multipart)");
         Ok(FileUploadResult {
             etag,
             key: key.raw().to_owned(),
