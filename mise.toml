@@ -1,3 +1,14 @@
+[env]
+AWS_ACCESS_KEY_ID = "GK000000000000000000000000"
+AWS_REGION = "us-east-1"
+AWS_SECRET_ACCESS_KEY = "0000000000000000000000000000000000000000000000000000000000000000"
+BENCH_BUCKET = "bench-bucket"
+COMPOSE_PROFILES = "all"
+S3_ENDPOINT_GARAGE = "http://localhost:9700"
+S3_ENDPOINT_MINIO = "http://localhost:9000"
+S3_ENDPOINT_RUSTFS = "http://localhost:9300"
+S3_ENDPOINT_SEAWEEDFS = "http://localhost:9500"
+
 [tools]
 "lefthook" = "latest"
 "npm:@commitlint/cli" = "latest"
