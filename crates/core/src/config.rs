@@ -7,7 +7,6 @@ use crate::auth::CredentialSource;
 /// Top-level client configuration.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-#[expect(clippy::partial_pub_fields, reason = "resolved_endpoint is an internal cache")]
 pub struct Config {
     /// How to obtain AWS credentials.
     pub credentials: CredentialSource,
@@ -60,9 +59,7 @@ impl Config {
     /// construction if needed.
     #[inline]
     #[must_use]
-    #[expect(clippy::impl_trait_in_params, reason = "ergonomic constructor API")]
     pub fn new(region: impl Into<String>, credentials: CredentialSource) -> Self {
-        #[expect(clippy::shadow_reuse, reason = "intentional into() conversion")]
         let region = region.into();
         let resolved_endpoint = format!("https://s3.{region}.amazonaws.com");
         Self {
@@ -78,11 +75,9 @@ impl Config {
     /// Create a new config with a custom endpoint for S3-compatible backends.
     #[inline]
     #[must_use]
-    #[expect(clippy::impl_trait_in_params, reason = "ergonomic constructor API")]
     pub fn with_endpoint(
         region: impl Into<String>, credentials: CredentialSource, endpoint: String,
     ) -> Self {
-        #[expect(clippy::shadow_reuse, reason = "intentional into() conversion")]
         let region = region.into();
         let resolved_endpoint = endpoint;
         Self {

@@ -12,10 +12,6 @@ use crate::{
 ///
 /// Cheap to clone (shares the underlying connection pool).
 #[derive(Debug, Clone)]
-#[expect(
-    clippy::field_scoped_visibility_modifiers,
-    reason = "direct field access avoids trivial getters"
-)]
 pub struct S3Client {
     pub(crate) config: Config,
     pub(crate) creds: Credentials,

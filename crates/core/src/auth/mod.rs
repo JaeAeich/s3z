@@ -26,10 +26,6 @@ pub enum CredentialSource {
 /// Resolved credentials ready for signing.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-#[expect(
-    clippy::field_scoped_visibility_modifiers,
-    reason = "crate-internal type with direct field access"
-)]
 pub(crate) struct Credentials {
     /// AWS access key ID.
     pub(crate) access_key: String,
@@ -43,10 +39,6 @@ pub(crate) struct Credentials {
 ///
 /// Returns [`error::Error::Auth`] if env vars are missing when using
 /// [`CredentialSource::Env`].
-#[expect(
-    clippy::pattern_type_mismatch,
-    reason = "matching on &enum — ref_patterns and pattern_type_mismatch conflict"
-)]
 pub(crate) fn resolve(source: &CredentialSource) -> Result<Credentials> {
     match source {
         CredentialSource::Env => {

@@ -8,10 +8,6 @@ use crate::{config::TransferConfig, transfer::part::Part};
 ///
 /// Panics if `config.part_size` is zero.
 #[expect(
-    clippy::redundant_pub_crate,
-    reason = "pub(crate) is intentional — parent module is private"
-)]
-#[expect(
     clippy::arithmetic_side_effects,
     reason = "offset/number bounded by file_size and part_size"
 )]

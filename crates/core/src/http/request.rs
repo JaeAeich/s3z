@@ -13,10 +13,6 @@ use crate::{
 /// # Errors
 ///
 /// Returns an error if the request cannot be built or signing fails.
-#[expect(
-    clippy::redundant_pub_crate,
-    reason = "pub(crate) is intentional — parent module is private"
-)]
 pub(crate) fn build_signed(
     method: Method, uri: Uri, body: Bytes, creds: &Credentials, region: &str,
 ) -> Result<Request<Bytes>> {
@@ -30,10 +26,6 @@ pub(crate) fn build_signed(
 ///
 /// The request is signed but the body hash is `UNSIGNED-PAYLOAD`, allowing
 /// the caller to replace the body with a stream after signing.
-#[expect(
-    clippy::redundant_pub_crate,
-    reason = "pub(crate) is intentional — parent module is private"
-)]
 pub(crate) fn build_signed_unsigned_payload(
     method: Method, uri: Uri, content_length: u64, creds: &Credentials, region: &str,
 ) -> Result<Request<Bytes>> {

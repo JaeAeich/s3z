@@ -5,7 +5,6 @@ use std::io;
 use http::uri::InvalidUri;
 
 /// Errors that can occur during s3z operations.
-#[expect(clippy::error_impl_error, reason = "this is the crate's primary error type")]
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
@@ -52,7 +51,6 @@ pub enum Error {
 }
 
 /// Convenience alias.
-#[expect(clippy::absolute_paths, reason = "must use full path to avoid shadowing std Result")]
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Helper to format an [`Error::Auth`] from a missing env var.

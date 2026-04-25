@@ -45,7 +45,6 @@ pub struct FileUploadResult {
 /// recursively. All files are uploaded under `dest_prefix` in `dest_bucket`,
 /// preserving relative paths from the common ancestor of `sources`.
 #[non_exhaustive]
-#[expect(clippy::partial_pub_fields, reason = "on_file_complete is set via builder method")]
 pub struct UploadRequest {
     /// Number of parts uploaded concurrently within a single multipart upload.
     pub concurrency_per_file: usize,
@@ -96,7 +95,6 @@ impl UploadRequest {
     /// tokio's read buffer size (~8 KiB) per in-flight part, not part size.
     #[inline]
     #[must_use]
-    #[expect(clippy::impl_trait_in_params, reason = "ergonomic constructor API")]
     pub fn new(
         sources: Vec<PathBuf>, dest_bucket: impl Into<String>, dest_prefix: impl Into<String>,
     ) -> Self {
@@ -117,7 +115,6 @@ impl UploadRequest {
     /// lightweight (e.g. update a progress bar).
     #[inline]
     #[must_use]
-    #[expect(clippy::impl_trait_in_params, reason = "ergonomic builder API")]
     pub fn on_file_complete(
         mut self, callback: impl Fn(&FileUploadResult) + Send + Sync + 'static,
     ) -> Self {
@@ -170,7 +167,6 @@ impl S3Client {
 
             match handle.map_err(|e| Error::Internal(e.to_string()))? {
                 Ok(result) => {
-                    #[expect(clippy::pattern_type_mismatch, reason = "matching on &Option")]
                     if let Some(cb) = &req.on_file_complete {
                         cb(&result);
                     }
@@ -195,7 +191,6 @@ impl S3Client {
 }
 
 /// Spawn a single-file upload task into the [`JoinSet`].
-#[expect(clippy::shadow_reuse, reason = "owned copies for the spawned task")]
 fn spawn_upload(
     set: &mut JoinSet<Result<FileUploadResult>>, http: &reqwest::Client, config: &Config,
     creds: &Credentials, req: &UploadRequest, path: &Path, key: &ObjectKey,
@@ -218,7 +213,6 @@ fn expand_sources(sources: &[PathBuf], prefix: &str) -> Result<Vec<(PathBuf, Obj
     for source in sources {
         if source.is_dir() {
             for walk_entry in WalkDir::new(source) {
-                #[expect(clippy::shadow_reuse, reason = "unwrapping Result into same-named value")]
                 let walk_entry = walk_entry?;
                 if !walk_entry.file_type().is_dir() {
                     let rel = walk_entry

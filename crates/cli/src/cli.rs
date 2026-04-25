@@ -66,7 +66,6 @@ pub(crate) struct UploadArgs {
 }
 
 /// Build an [`s3z::Config`] from the global CLI options.
-#[expect(clippy::pattern_type_mismatch, reason = "matching on &Option fields")]
 pub(crate) fn build_config(cli: &Cli) -> Config {
     let creds = match (&cli.access_key, &cli.secret_key) {
         (Some(ak), Some(sk)) => {

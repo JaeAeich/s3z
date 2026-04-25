@@ -47,9 +47,7 @@ impl ObjectKey {
     /// Create a new object key, eagerly percent-encoding it.
     #[inline]
     #[must_use]
-    #[expect(clippy::impl_trait_in_params, reason = "ergonomic constructor API")]
     pub fn new(key: impl Into<String>) -> Self {
-        #[expect(clippy::shadow_reuse, reason = "intentional into() conversion")]
         let key = key.into();
         let encoded = percent_encoding::utf8_percent_encode(&key, S3_ENCODE_SET).to_string();
         Self {

@@ -31,24 +31,12 @@
         clippy::panic,
         clippy::wildcard_enum_match_arm,
         clippy::expect_used,
-        clippy::absolute_paths,
-        clippy::pattern_type_mismatch,
-        clippy::std_instead_of_core,
         reason = "test code"
     )
 )]
 #![expect(
     clippy::multiple_crate_versions,
     reason = "transitive deps from aws-sigv4 pull duplicate versions"
-)]
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "types like Config and Error are re-exported at crate root"
-)]
-#![expect(clippy::pub_use, reason = "re-exports form the public API surface")]
-#![expect(
-    clippy::redundant_pub_crate,
-    reason = "pub(crate) in private modules is intentional for clarity"
 )]
 
 pub mod auth;
