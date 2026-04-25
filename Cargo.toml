@@ -24,9 +24,11 @@ tokio = { features = [
   "rt-multi-thread",
   "sync",
 ], version = "1" }
+tokio-util = { features = ["io"], version = "0.7" }
 tracing = "0.1"
 tracing-subscriber = { features = ["env-filter", "fmt"], version = "0.3" }
 walkdir = "2"
+wiremock = "0.6"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

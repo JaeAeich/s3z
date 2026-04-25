@@ -92,8 +92,8 @@ impl UploadRequest {
     ///
     /// Defaults: 32 workers, 8 concurrent parts per file.
     ///
-    /// Parts are streamed from disk, so memory usage is bounded by
-    /// tokio's read buffer size (~8 KiB) per in-flight part, not part size.
+    /// Each part is streamed from disk through a 256 KiB buffer, so peak
+    /// memory per file is roughly `concurrency_per_file * 256 KiB`.
     #[inline]
     #[must_use]
     pub fn new(

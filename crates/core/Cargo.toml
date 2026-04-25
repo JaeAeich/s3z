@@ -9,8 +9,12 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tracing = { optional = true, workspace = true }
 walkdir = { workspace = true }
+
+[dev-dependencies]
+wiremock = { workspace = true }
 
 [features]
 default = []

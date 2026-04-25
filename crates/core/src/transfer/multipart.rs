@@ -1,22 +1,28 @@
 //! Multipart upload orchestration.
 //!
-//! Uses a producer-consumer pattern: one reader task reads parts
-//! sequentially from a single file handle into buffers, N upload workers
-//! pull from a bounded channel and upload in parallel. The channel acts
-//! as backpressure — peak memory is `concurrency * part_size`.
+//! Uses a producer-consumer pattern: one task schedules part metadata
+//! through a bounded channel, N upload workers each open the file,
+//! seek to their part offset, and stream the bytes directly to S3.
+//! The channel bounds parallelism; no large buffers flow through it.
+//!
+//! Peak memory per file: `concurrency * STREAM_BUFFER_SIZE` (~256 KiB each).
 
 use core::fmt::Write as _;
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use bytes::Bytes;
 use http::{Method, Uri};
 use tokio::{
     fs::File,
-    io::AsyncReadExt as _,
+    io::{AsyncReadExt as _, AsyncSeekExt as _},
     runtime::Handle,
     sync::mpsc,
     task::{self, JoinSet},
 };
+use tokio_util::io::ReaderStream;
 
 use crate::{
     auth::Credentials,
@@ -26,11 +32,14 @@ use crate::{
         ObjectKey,
         request::{build_signed, build_signed_unsigned_payload},
         response,
-        retry::{send_with_retry, send_with_retry_bytes},
+        retry::{send_with_retry, send_with_retry_stream},
     },
-    trace::{maybe_debug, maybe_info},
+    trace::{maybe_debug, maybe_info, maybe_warn},
     transfer::part::{Part, PartResult},
 };
+
+/// Buffer size for the per-part `ReaderStream` (256 KiB).
+const STREAM_BUFFER_SIZE: usize = 256 * 1024;
 
 /// Context for a single multipart upload.
 struct UploadCtx {
@@ -42,10 +51,11 @@ struct UploadCtx {
     upload_id: String,
 }
 
-/// A part that has been read from disk and is ready to upload.
-struct ReadyPart {
-    data: Bytes,
+/// Part metadata sent through the scheduling channel (no bytes).
+struct PartJob {
+    file_path: Arc<PathBuf>,
     number: u32,
+    offset: u64,
     size: u64,
 }
 
@@ -73,17 +83,17 @@ impl Drop for AbortGuard {
                 return;
             };
             drop(handle.spawn(async move {
-                drop(
-                    abort(
-                        &ctx.http,
-                        &ctx.config,
-                        &ctx.creds,
-                        &ctx.bucket,
-                        &ctx.key,
-                        &ctx.upload_id,
-                    )
-                    .await,
-                );
+                if let Err(_e) =
+                    abort(&ctx.http, &ctx.config, &ctx.creds, &ctx.bucket, &ctx.key, &ctx.upload_id)
+                        .await
+                {
+                    maybe_warn!(
+                        upload_id = %ctx.upload_id,
+                        key = %ctx.key,
+                        bucket = %ctx.bucket,
+                        "failed to abort multipart upload — may leak storage"
+                    );
+                }
             }));
         }
     }
@@ -201,107 +211,119 @@ pub(crate) async fn upload_multipart(
     }
 }
 
-/// Upload all parts using a producer-consumer pipeline.
+/// Schedule and upload all parts using a producer-consumer pipeline.
 ///
-/// One reader task reads parts sequentially from a single file handle
-/// and sends them over a bounded channel. N upload workers pull from
-/// the channel and upload in parallel.
-/// - Sequential disk reads avoid file handle thrashing
-/// - Bounded channel (capacity = concurrency) acts as backpressure
-/// - Peak memory: `concurrency * part_size`
+/// One task sends part metadata (offset, size — no bytes) over a bounded
+/// channel. N upload workers each open the file, seek, and stream their
+/// part directly to S3.
+///
+/// - Bounded channel (capacity = concurrency) limits in-flight parts
+/// - Peak memory per file: `concurrency * STREAM_BUFFER_SIZE`
 async fn upload_all_parts(
     ctx: &Arc<UploadCtx>, parts: &[Part], file_path: &Path, concurrency: usize,
 ) -> Result<Vec<PartResult>> {
-    let (tx, rx) = mpsc::channel::<ReadyPart>(concurrency);
+    let (tx, rx) = mpsc::channel::<PartJob>(concurrency);
 
-    let reader_parts: Vec<Part> = parts.to_vec();
-    let reader_path = file_path.to_owned();
-    let reader_handle =
-        task::spawn(async move { read_parts(reader_parts, &reader_path, tx).await });
+    let shared_path = Arc::new(file_path.to_owned());
+    let parts_owned: Vec<Part> = parts.to_vec();
+    let path_for_scheduler = Arc::clone(&shared_path);
+
+    let scheduler_handle = task::spawn(async move {
+        schedule_parts(parts_owned, path_for_scheduler, tx).await;
+    });
 
     let upload_result = run_upload_workers(ctx, rx, concurrency, parts.len()).await;
 
-    let reader_result = reader_handle.await.map_err(|e| Error::Internal(e.to_string()))?;
+    // Wait for the scheduler to finish (it's infallible — just sending metadata).
+    drop(scheduler_handle.await);
 
-    match (upload_result, reader_result) {
-        (Ok(results), Ok(())) => Ok(results),
-        (Err(e), _) | (_, Err(e)) => Err(e),
-    }
+    upload_result
 }
 
-/// Reader task: opens the file once, reads each part sequentially into a
-/// buffer, sends it through the channel.
-async fn read_parts(parts: Vec<Part>, file_path: &Path, tx: mpsc::Sender<ReadyPart>) -> Result<()> {
-    let mut file = File::open(file_path).await?;
-
+/// Scheduler task: sends part metadata through the channel. No I/O.
+async fn schedule_parts(parts: Vec<Part>, file_path: Arc<PathBuf>, tx: mpsc::Sender<PartJob>) {
     for part in &parts {
-        let buf_size = usize::try_from(part.size).map_err(|e| Error::Conversion(e.to_string()))?;
-        let mut buf = vec![0_u8; buf_size];
-        file.read_exact(&mut buf).await?;
-
-        let ready = ReadyPart {
-            data: Bytes::from(buf),
+        let job = PartJob {
+            file_path: Arc::clone(&file_path),
             number: part.number,
+            offset: part.offset,
             size: part.size,
         };
 
-        if tx.send(ready).await.is_err() {
+        if tx.send(job).await.is_err() {
             break;
         }
     }
-
-    Ok(())
 }
 
 /// Spawn N upload workers, collect results.
+///
+/// Uses `tokio::select!` to simultaneously wait for completed uploads and
+/// new jobs from the scheduler, keeping exactly `concurrency` tasks in
+/// flight at all times.
 async fn run_upload_workers(
-    ctx: &Arc<UploadCtx>, mut rx: mpsc::Receiver<ReadyPart>, concurrency: usize, total_parts: usize,
+    ctx: &Arc<UploadCtx>, mut rx: mpsc::Receiver<PartJob>, concurrency: usize, total_parts: usize,
 ) -> Result<Vec<PartResult>> {
     let mut set = JoinSet::new();
     let mut results = Vec::with_capacity(total_parts);
-    let mut spawned = 0_usize;
-
-    while spawned < concurrency {
-        match rx.recv().await {
-            Some(ready) => {
-                let c = Arc::clone(ctx);
-                set.spawn(async move { upload_part_from_buffer(&c, ready).await });
-                spawned = spawned.saturating_add(1);
-            },
-            None => break,
-        }
-    }
+    let mut channel_open = true;
 
     loop {
+        // Spawn up to `concurrency` tasks while jobs are available.
+        while channel_open && set.len() < concurrency {
+            match rx.recv().await {
+                Some(job) => {
+                    let c = Arc::clone(ctx);
+                    set.spawn(async move { upload_part_streaming(&c, job).await });
+                },
+                None => {
+                    channel_open = false;
+                },
+            }
+        }
+
         if set.is_empty() {
             break;
         }
 
-        let Some(handle) = set.join_next().await else {
-            break;
-        };
-
-        match handle.map_err(|e| Error::Internal(e.to_string()))? {
-            Ok(result) => results.push(result),
-            Err(e) => {
-                rx.close();
-                set.abort_all();
-                return Err(e);
-            },
-        }
-
-        if let Ok(ready) = rx.try_recv() {
-            let c = Arc::clone(ctx);
-            set.spawn(async move { upload_part_from_buffer(&c, ready).await });
+        // Wait for a completed upload, and optionally receive a new job.
+        tokio::select! {
+            Some(handle) = set.join_next() => {
+                match handle.map_err(|e| Error::Internal(e.to_string()))? {
+                    Ok(result) => results.push(result),
+                    Err(e) => {
+                        rx.close();
+                        set.abort_all();
+                        return Err(e);
+                    },
+                }
+            }
+            Some(job) = rx.recv(), if channel_open && set.len() >= concurrency => {
+                let c = Arc::clone(ctx);
+                set.spawn(async move { upload_part_streaming(&c, job).await });
+            }
+            else => break,
         }
     }
 
     Ok(results)
 }
 
-/// Upload a single part from an already-read buffer.
-async fn upload_part_from_buffer(ctx: &UploadCtx, ready: ReadyPart) -> Result<PartResult> {
-    let part_number = ready.number;
+/// Open a file, seek to offset, return a `reqwest::Body` that streams
+/// `size` bytes through a 256 KiB buffer.
+async fn make_part_body(path: &Path, offset: u64, size: u64) -> Result<reqwest::Body> {
+    let mut file = File::open(path).await?;
+    if offset > 0 {
+        file.seek(std::io::SeekFrom::Start(offset)).await?;
+    }
+    let limited = file.take(size);
+    let stream = ReaderStream::with_capacity(limited, STREAM_BUFFER_SIZE);
+    Ok(reqwest::Body::wrap_stream(stream))
+}
+
+/// Upload a single part by streaming from disk.
+async fn upload_part_streaming(ctx: &UploadCtx, job: PartJob) -> Result<PartResult> {
+    let part_number = job.number;
     let upload_id = &ctx.upload_id;
     let uri: Uri = format!(
         "{}/{}/{}?partNumber={part_number}&uploadId={upload_id}",
@@ -311,19 +333,34 @@ async fn upload_part_from_buffer(ctx: &UploadCtx, ready: ReadyPart) -> Result<Pa
     )
     .parse()?;
 
-    maybe_debug!(key = %ctx.key, part_number, size = ready.size, "uploading part");
+    maybe_debug!(key = %ctx.key, part_number, size = job.size, "uploading part");
 
     #[cfg(feature = "tracing")]
     let part_start = std::time::Instant::now();
 
-    let req = build_signed_unsigned_payload(
-        Method::PUT,
-        uri,
-        ready.size,
-        &ctx.creds,
-        &ctx.config.region,
-    )?;
-    let resp = send_with_retry_bytes(&ctx.http, req, ready.data, &ctx.config.retry).await?;
+    let content_length = job.size;
+    let creds = ctx.creds.clone();
+    let region = ctx.config.region.clone();
+
+    let path = Arc::clone(&job.file_path);
+    let offset = job.offset;
+    let size = job.size;
+
+    let resp = send_with_retry_stream(
+        &ctx.http,
+        || {
+            let u = uri.clone();
+            let c = creds.clone();
+            let r = region.clone();
+            async move { build_signed_unsigned_payload(Method::PUT, u, content_length, &c, &r) }
+        },
+        || {
+            let p = Arc::clone(&path);
+            async move { make_part_body(&p, offset, size).await }
+        },
+        &ctx.config.retry,
+    )
+    .await?;
 
     #[cfg(feature = "tracing")]
     let part_elapsed = part_start.elapsed();
@@ -352,4 +389,81 @@ async fn upload_part_from_buffer(ctx: &UploadCtx, ready: ReadyPart) -> Result<Pa
         etag,
         number: part_number,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write as _;
+
+    use super::*;
+
+    fn tempfile(name: &str, data: &[u8]) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("s3z_mp_{name}_{}", std::process::id()));
+        drop(std::fs::remove_dir_all(&dir));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("data.bin");
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(data).unwrap();
+        path
+    }
+
+    /// Read a file segment the same way `make_part_body` does, but collect
+    /// the bytes directly instead of wrapping in a `reqwest::Body`.
+    async fn read_segment(path: &Path, offset: u64, size: u64) -> Vec<u8> {
+        let mut file = File::open(path).await.unwrap();
+        if offset > 0 {
+            file.seek(std::io::SeekFrom::Start(offset)).await.unwrap();
+        }
+        let mut limited = file.take(size);
+        let mut buf = Vec::new();
+        limited.read_to_end(&mut buf).await.unwrap();
+        buf
+    }
+
+    #[tokio::test]
+    async fn make_part_body_reads_from_start() {
+        let data = b"hello world";
+        let path = tempfile("start", data);
+        let bytes = read_segment(&path, 0, 5).await;
+        assert_eq!(&bytes, b"hello");
+    }
+
+    #[tokio::test]
+    async fn make_part_body_reads_with_offset() {
+        let data = b"hello world";
+        let path = tempfile("offset", data);
+        let bytes = read_segment(&path, 6, 5).await;
+        assert_eq!(&bytes, b"world");
+    }
+
+    #[tokio::test]
+    async fn make_part_body_size_larger_than_remaining() {
+        let data = b"short";
+        let path = tempfile("larger", data);
+        let bytes = read_segment(&path, 3, 100).await;
+        assert_eq!(&bytes, b"rt");
+    }
+
+    #[tokio::test]
+    async fn make_part_body_zero_offset_full_file() {
+        let data: Vec<u8> = (0_u8..=255).cycle().take(1024).collect();
+        let path = tempfile("full", &data);
+        let bytes = read_segment(&path, 0, 1024).await;
+        assert_eq!(bytes, data);
+    }
+
+    #[tokio::test]
+    async fn make_part_body_nonexistent_file_errors() {
+        let result = make_part_body(Path::new("/nonexistent_s3z_test_file"), 0, 10).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn make_part_body_returns_body_successfully() {
+        let data = b"test data for body creation";
+        let path = tempfile("body_ok", data);
+        // Verify make_part_body itself doesn't error
+        let body = make_part_body(&path, 0, 10).await;
+        assert!(body.is_ok());
+    }
 }

@@ -5,6 +5,8 @@
 pub(crate) struct Part {
     /// 1-indexed part number (S3 requirement).
     pub number: u32,
+    /// Byte offset from the start of the file.
+    pub offset: u64,
     /// Number of bytes in this part.
     pub size: u64,
 }

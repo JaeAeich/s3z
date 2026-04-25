@@ -79,10 +79,10 @@ impl Config {
         region: impl Into<String>, credentials: CredentialSource, endpoint: String,
     ) -> Self {
         let region = region.into();
-        let resolved_endpoint = endpoint;
+        let resolved_endpoint = endpoint.clone();
         Self {
             credentials,
-            endpoint: Some(resolved_endpoint.clone()),
+            endpoint: Some(endpoint),
             region,
             resolved_endpoint,
             retry: RetryPolicy::default(),
@@ -94,7 +94,7 @@ impl Config {
 impl TransferConfig {
     /// Connection pool size — must be >= peak in-flight requests
     /// (`workers * concurrency_per_file`) to avoid connection churn.
-    pub(crate) const MAX_IDLE_CONNECTIONS: usize = 512;
+    pub(crate) const MAX_IDLE_CONNECTIONS: usize = 256;
 }
 
 impl Default for RetryPolicy {
