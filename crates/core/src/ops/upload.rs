@@ -1,17 +1,14 @@
 //! Batch upload operation — local files/dirs to S3.
 
 use std::{
+    fmt,
     io,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use bytes::Bytes;
-use tokio::{
-    fs,
-    sync::{AcquireError, OwnedSemaphorePermit, Semaphore},
-    task::JoinSet,
-};
+use tokio::{fs, task::JoinSet};
 use walkdir::WalkDir;
 
 use crate::{
@@ -22,6 +19,9 @@ use crate::{
     http::{ObjectKey, request::build_signed, retry::send_with_retry},
     transfer::{multipart, scheduler},
 };
+
+/// Callback invoked after each file upload completes successfully.
+type ProgressCallback = Arc<dyn Fn(&FileUploadResult) + Send + Sync>;
 
 /// Outcome for a single uploaded file.
 #[derive(Debug, Clone)]
@@ -44,8 +44,8 @@ pub struct FileUploadResult {
 /// Accepts a list of files and/or directories. Directories are walked
 /// recursively. All files are uploaded under `dest_prefix` in `dest_bucket`,
 /// preserving relative paths from the common ancestor of `sources`.
-#[derive(Debug, Clone)]
 #[non_exhaustive]
+#[expect(clippy::partial_pub_fields, reason = "on_file_complete is set via builder method")]
 pub struct UploadRequest {
     /// Number of parts uploaded concurrently within a single multipart upload.
     pub concurrency_per_file: usize,
@@ -53,13 +53,41 @@ pub struct UploadRequest {
     pub dest_bucket: String,
     /// Key prefix in the bucket (e.g. `data/2024/`).
     pub dest_prefix: String,
+    /// Callback invoked after each file upload completes.
+    on_file_complete: Option<ProgressCallback>,
     /// Local file or directory paths to upload.
     pub sources: Vec<PathBuf>,
     /// Number of files uploaded in parallel.
     pub workers: usize,
 }
 
+impl fmt::Debug for UploadRequest {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UploadRequest")
+            .field("concurrency_per_file", &self.concurrency_per_file)
+            .field("dest_bucket", &self.dest_bucket)
+            .field("dest_prefix", &self.dest_prefix)
+            .field("on_file_complete", &self.on_file_complete.as_ref().map(|_| ".."))
+            .field("sources", &self.sources)
+            .field("workers", &self.workers)
+            .finish()
+    }
+}
+
 impl UploadRequest {
+    /// Expand sources and count the total number of files that would be uploaded.
+    ///
+    /// Useful for setting up progress bars before calling [`S3Client::upload`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if source expansion fails (e.g. non-UTF-8 paths).
+    #[inline]
+    pub fn file_count(&self) -> Result<usize> {
+        expand_sources(&self.sources, &self.dest_prefix).map(|entries| entries.len())
+    }
+
     /// Create a new upload request with sensible defaults.
     ///
     /// Defaults: 32 workers, 8 concurrent parts per file.
@@ -76,9 +104,25 @@ impl UploadRequest {
             concurrency_per_file: 8,
             dest_bucket: dest_bucket.into(),
             dest_prefix: dest_prefix.into(),
+            on_file_complete: None,
             sources,
             workers: 32,
         }
+    }
+
+    /// Set a callback that fires after each file upload completes.
+    ///
+    /// The callback receives a reference to the [`FileUploadResult`] for the
+    /// just-completed file. It runs on the tokio worker thread, so keep it
+    /// lightweight (e.g. update a progress bar).
+    #[inline]
+    #[must_use]
+    #[expect(clippy::impl_trait_in_params, reason = "ergonomic builder API")]
+    pub fn on_file_complete(
+        mut self, callback: impl Fn(&FileUploadResult) + Send + Sync + 'static,
+    ) -> Self {
+        self.on_file_complete = Some(Arc::new(callback));
+        self
     }
 }
 
@@ -105,36 +149,42 @@ impl S3Client {
     pub async fn upload(&self, req: UploadRequest) -> Result<UploadResult> {
         let creds = self.creds.clone();
         let entries = expand_sources(&req.sources, &req.dest_prefix)?;
+        let total = entries.len();
 
-        let sem = Arc::new(Semaphore::new(req.workers));
         let mut set = JoinSet::new();
+        let mut entries_iter = entries.into_iter();
+        let mut files = Vec::with_capacity(total);
 
-        for (path, key) in entries {
-            // Acquire permit before spawning to bound both memory and concurrency.
-            let permit: OwnedSemaphorePermit = Arc::clone(&sem)
-                .acquire_owned()
-                .await
-                .map_err(|e: AcquireError| Error::Internal(e.to_string()))?;
-            let client = self.http.clone();
-            let cfg = self.config.clone();
-            let cr = creds.clone();
-            let bkt = req.dest_bucket.clone();
-            let conc = req.concurrency_per_file;
-
-            set.spawn(async move {
-                let _permit = permit;
-                upload_single_file(&client, &cfg, &cr, &bkt, &key, &path, conc).await
-            });
+        // Seed the JoinSet with up to `workers` initial tasks.
+        for (path, key) in entries_iter.by_ref().take(req.workers) {
+            spawn_upload(&mut set, &self.http, &self.config, &creds, &req, &path, &key);
         }
 
-        let mut files = Vec::with_capacity(set.len());
-        while let Some(handle) = set.join_next().await {
+        // Collect completed results and spawn replacements to maintain
+        // `workers` in-flight tasks. This ensures the progress callback
+        // fires as each file finishes, not all at the end.
+        loop {
+            let Some(handle) = set.join_next().await else {
+                break;
+            };
+
             match handle.map_err(|e| Error::Internal(e.to_string()))? {
-                Ok(result) => files.push(result),
+                Ok(result) => {
+                    #[expect(clippy::pattern_type_mismatch, reason = "matching on &Option")]
+                    if let Some(cb) = &req.on_file_complete {
+                        cb(&result);
+                    }
+                    files.push(result);
+                },
                 Err(e) => {
                     set.abort_all();
                     return Err(e);
                 },
+            }
+
+            // Spawn the next entry now that a slot freed up.
+            if let Some((path, key)) = entries_iter.next() {
+                spawn_upload(&mut set, &self.http, &self.config, &creds, &req, &path, &key);
             }
         }
 
@@ -142,6 +192,23 @@ impl S3Client {
             files,
         })
     }
+}
+
+/// Spawn a single-file upload task into the [`JoinSet`].
+#[expect(clippy::shadow_reuse, reason = "owned copies for the spawned task")]
+fn spawn_upload(
+    set: &mut JoinSet<Result<FileUploadResult>>, http: &reqwest::Client, config: &Config,
+    creds: &Credentials, req: &UploadRequest, path: &Path, key: &ObjectKey,
+) {
+    let client = http.clone();
+    let cfg = config.clone();
+    let cr = creds.clone();
+    let bkt = req.dest_bucket.clone();
+    let conc = req.concurrency_per_file;
+    let path = path.to_owned();
+    let key = key.clone();
+
+    set.spawn(async move { upload_single_file(&client, &cfg, &cr, &bkt, &key, &path, conc).await });
 }
 
 /// Expand sources into a flat list of `(local_path, object_key)` pairs.

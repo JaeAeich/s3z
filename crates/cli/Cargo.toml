@@ -5,6 +5,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+indicatif = { workspace = true }
 s3z = { path = "../core" }
 tokio = { workspace = true }
 
