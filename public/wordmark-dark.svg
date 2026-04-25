@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="220" viewBox="0 0 520 220">
+  <rect width="520" height="220" fill="#1a1614"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@1,800&amp;display=swap');
+  </style>
+  <text x="260" y="130" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="140" font-weight="800" font-style="italic" letter-spacing="-6">
+    <tspan fill="#f3ede1">s</tspan><tspan fill="#c8512a">3</tspan><tspan fill="#f3ede1">z</tspan>
+  </text>
+</svg>

@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>s3z — Logo & Banner</title>
+<meta name="viewport" content="width=1400" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;0,800;1,400;1,500;1,700;1,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --rust: #c8512a;
+    --rust-deep: #a8401f;
+    --rust-bright: #e3692f;
+    --ink: #1a1614;
+    --ink-soft: #2a2421;
+    --cream: #f3ede1;
+    --cream-warm: #ece4d3;
+    --cream-deep: #e3d9c3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: #e8e4dd;
+    color: var(--ink);
+    padding: 60px 40px 120px;
+  }
+  .page-title {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(26,22,20,0.5);
+    margin-bottom: 60px;
+  }
+  .section { margin-bottom: 80px; }
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  .section-sub {
+    font-size: 13px;
+    color: rgba(26,22,20,0.55);
+    margin-bottom: 32px;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    align-items: flex-start;
+  }
+  .card {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .card-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(26,22,20,0.5);
+    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  /* Wordmark base */
+  .wm {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: -0.04em;
+    line-height: 0.9;
+    display: inline-flex;
+    align-items: baseline;
+  }
+  .wm-upright { font-style: normal; }
+
+  /* Tile container */
+  .tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">s3z — logo & banner system</div>
+
+<!-- ══════════════════════════════════════════════════════════
+    Section 1 — Wordmark variations
+    ══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">Wordmark</div>
+  <div class="section-sub">JetBrains Mono italic 800. s = ink, 3 = rust, z = ink. This is the logo.</div>
+  <div class="row">
+
+    <div>
+      <div class="card-label">A — Large (cream)</div>
+      <div class="card tile" style="width:520px;height:220px;background:var(--cream);">
+        <span class="wm" style="font-size:140px;color:var(--ink);">s<span style="color:var(--rust);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">B — Large (ink bg)</div>
+      <div class="card tile" style="width:520px;height:220px;background:var(--ink);">
+        <span class="wm" style="font-size:140px;color:var(--cream);">s<span style="color:var(--rust);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">C — Mono (all ink)</div>
+      <div class="card tile" style="width:520px;height:220px;background:var(--cream);">
+        <span class="wm" style="font-size:140px;color:var(--ink);">s<span style="color:var(--ink);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">D — Mono (all cream on ink)</div>
+      <div class="card tile" style="width:520px;height:220px;background:var(--ink);">
+        <span class="wm" style="font-size:140px;color:var(--cream);">s<span style="color:var(--cream);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">E — Upright (no italic)</div>
+      <div class="card tile" style="width:520px;height:220px;background:var(--cream);">
+        <span class="wm wm-upright" style="font-size:140px;color:var(--ink);">s<span style="color:var(--rust);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">F — On rust</div>
+      <div class="card tile" style="width:520px;height:220px;background:var(--rust);">
+        <span class="wm" style="font-size:140px;color:var(--cream);">s<span style="color:var(--ink);">3</span>z</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+    Section 2 — Square avatars (repo/org icon)
+    ══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">Square avatars — 256x256</div>
+  <div class="section-sub">The repo / org icon. Wordmark centered — no separate mark.</div>
+  <div class="row">
+
+    <div>
+      <div class="card-label">A — Cream</div>
+      <div class="card tile" style="width:260px;height:260px;background:var(--cream);">
+        <span class="wm" style="font-size:88px;color:var(--ink);">s<span style="color:var(--rust);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">B — Ink</div>
+      <div class="card tile" style="width:260px;height:260px;background:var(--ink);">
+        <span class="wm" style="font-size:88px;color:var(--cream);">s<span style="color:var(--rust);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">C — Rust</div>
+      <div class="card tile" style="width:260px;height:260px;background:var(--rust);">
+        <span class="wm" style="font-size:88px;color:var(--cream);">s<span style="color:var(--ink);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">D — Cream mono</div>
+      <div class="card tile" style="width:260px;height:260px;background:var(--cream);">
+        <span class="wm" style="font-size:88px;color:var(--ink);">s<span style="color:var(--ink);">3</span>z</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">E — Ink mono</div>
+      <div class="card tile" style="width:260px;height:260px;background:var(--ink);">
+        <span class="wm" style="font-size:88px;color:var(--cream);">s<span style="color:var(--cream);">3</span>z</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+    Section 3 — GitHub social preview banners (1280x640)
+    ══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">GitHub social preview — 1280x640</div>
+  <div class="section-sub">What renders when the repo is shared on Twitter / Slack / etc.</div>
+  <div class="row" style="flex-direction:column;">
+
+    <!-- Banner A: Cream + corner ticks -->
+    <div>
+      <div class="card-label">A — Cream + corner ticks</div>
+      <div class="card" style="width:1280px;height:640px;background:var(--cream);position:relative;overflow:hidden;">
+        <!-- Speed lines -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" preserveAspectRatio="none">
+          <g transform="rotate(-18 400 200)">
+            <line x1="-140" y1="-200" x2="-140" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="-84" y1="-200" x2="-84" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="-70" y1="-200" x2="-70" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="-56" y1="-200" x2="-56" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="-42" y1="-200" x2="-42" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="14" y1="-200" x2="14" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="28" y1="-200" x2="28" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="42" y1="-200" x2="42" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="56" y1="-200" x2="56" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="112" y1="-200" x2="112" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="126" y1="-200" x2="126" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="140" y1="-200" x2="140" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="154" y1="-200" x2="154" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="210" y1="-200" x2="210" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="224" y1="-200" x2="224" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="238" y1="-200" x2="238" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="252" y1="-200" x2="252" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="308" y1="-200" x2="308" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="322" y1="-200" x2="322" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="336" y1="-200" x2="336" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="350" y1="-200" x2="350" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="406" y1="-200" x2="406" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="420" y1="-200" x2="420" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="434" y1="-200" x2="434" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="448" y1="-200" x2="448" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="504" y1="-200" x2="504" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="518" y1="-200" x2="518" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="532" y1="-200" x2="532" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="546" y1="-200" x2="546" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="602" y1="-200" x2="602" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="616" y1="-200" x2="616" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="630" y1="-200" x2="630" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="644" y1="-200" x2="644" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="700" y1="-200" x2="700" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="714" y1="-200" x2="714" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+          </g>
+        </svg>
+        <!-- Corner ticks -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;">
+          <rect x="24" y="24" width="28" height="2.5" fill="var(--ink)"/>
+          <rect x="24" y="24" width="2.5" height="28" fill="var(--ink)"/>
+          <rect x="1228" y="24" width="28" height="2.5" fill="var(--ink)"/>
+          <rect x="1253.5" y="24" width="2.5" height="28" fill="var(--ink)"/>
+          <rect x="24" y="613.5" width="28" height="2.5" fill="var(--ink)"/>
+          <rect x="24" y="588" width="2.5" height="28" fill="var(--ink)"/>
+          <rect x="1228" y="613.5" width="28" height="2.5" fill="var(--ink)"/>
+          <rect x="1253.5" y="588" width="2.5" height="28" fill="var(--ink)"/>
+        </svg>
+        <!-- Content -->
+        <div style="position:absolute;top:50%;left:80px;right:80px;transform:translateY(-50%);display:flex;flex-direction:column;gap:22px;">
+          <span class="wm" style="font-size:300px;color:var(--ink);letter-spacing:-0.05em;">s<span style="color:var(--rust);">3</span>z</span>
+          <div style="font-size:28px;font-weight:500;color:var(--ink-soft);letter-spacing:0.02em;font-style:italic;">
+            // s3 ops. fearlessly fast.
+          </div>
+        </div>
+        <!-- Rust accent bar -->
+        <div style="position:absolute;bottom:56px;left:80px;width:240px;height:4px;background:var(--rust);"></div>
+        <!-- Top right label -->
+        <div style="position:absolute;top:40px;right:80px;font-size:14px;font-weight:500;color:var(--ink);letter-spacing:0.18em;text-transform:uppercase;">
+          s3 ops &mdash; in rust
+        </div>
+      </div>
+    </div>
+
+    <!-- Banner B: Dark with rust wedge -->
+    <div>
+      <div class="card-label">B — Dark with rust wedge</div>
+      <div class="card" style="width:1280px;height:640px;background:var(--ink);position:relative;overflow:hidden;color:var(--cream);">
+        <!-- Speed lines -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" preserveAspectRatio="none">
+          <g transform="rotate(-18 400 200)">
+            <line x1="0" y1="-200" x2="0" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="98" y1="-200" x2="98" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="196" y1="-200" x2="196" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="294" y1="-200" x2="294" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="392" y1="-200" x2="392" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="490" y1="-200" x2="490" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="588" y1="-200" x2="588" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="686" y1="-200" x2="686" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+          </g>
+        </svg>
+        <!-- Rust wedge -->
+        <div style="position:absolute;right:-120px;top:-80px;width:700px;height:800px;background:var(--rust);clip-path:polygon(40% 0,100% 0,100% 100%,0% 100%);opacity:0.95;"></div>
+        <div style="position:absolute;right:-120px;top:-80px;width:700px;height:800px;background:var(--rust-deep);clip-path:polygon(70% 0,100% 0,100% 100%,30% 100%);opacity:0.6;"></div>
+        <!-- Content -->
+        <div style="position:absolute;top:50%;left:80px;transform:translateY(-50%);display:flex;flex-direction:column;gap:22px;">
+          <span class="wm" style="font-size:260px;color:var(--cream);letter-spacing:-0.05em;">s<span style="color:var(--rust);">3</span>z</span>
+          <div style="font-size:26px;font-weight:500;color:rgba(243,237,225,0.7);letter-spacing:0.02em;font-style:italic;max-width:700px;">
+            // s3 ops. fearlessly fast.<br>
+            <span style="color:rgba(243,237,225,0.85);">// streaming. parallel. no bloat.</span>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:56px;left:80px;width:240px;height:4px;background:var(--rust);"></div>
+      </div>
+    </div>
+
+    <!-- Banner C: Minimal wordmark -->
+    <div>
+      <div class="card-label">C — Minimal wordmark</div>
+      <div class="card" style="width:1280px;height:640px;background:var(--cream);position:relative;overflow:hidden;">
+        <!-- Top bar -->
+        <div style="position:absolute;top:80px;left:80px;right:80px;font-size:13px;color:var(--ink-soft);letter-spacing:0.2em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;">
+          <span>fearlessly fast</span>
+          <span>s3 &mdash; in rust</span>
+        </div>
+        <!-- Center wordmark -->
+        <div style="position:absolute;top:50%;left:80px;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;">
+          <span class="wm" style="font-size:400px;color:var(--ink);letter-spacing:-0.06em;">s<span style="color:var(--rust);">3</span>z</span>
+          <div style="font-size:28px;font-weight:500;color:var(--ink-soft);font-style:italic;margin-top:16px;">
+            fearlessly fast s3 ops, in rust.
+          </div>
+        </div>
+        <!-- Bottom bar -->
+        <div style="position:absolute;bottom:80px;left:80px;right:80px;display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--ink);letter-spacing:0.14em;text-transform:uppercase;">
+          <span>fearlessly fast</span>
+          <span style="color:var(--rust);">&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;</span>
+          <span>in rust</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Banner D: Parallel streams -->
+    <div>
+      <div class="card-label">D — Parallel streams</div>
+      <div class="card" style="width:1280px;height:640px;background:var(--cream);position:relative;overflow:hidden;">
+        <!-- Parallel streams SVG -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 1280 640" preserveAspectRatio="none" id="streams-social"></svg>
+        <!-- Wordmark plate -->
+        <div style="position:absolute;top:50%;left:80px;transform:translateY(-50%);background:var(--cream);padding:24px 32px;box-shadow:0 0 0 1.5px var(--ink);">
+          <span class="wm" style="font-size:220px;color:var(--ink);letter-spacing:-0.05em;">s<span style="color:var(--rust);">3</span>z</span>
+          <div style="font-size:22px;font-weight:500;color:var(--ink-soft);font-style:italic;margin-top:14px;">
+            // s3 ops. fearlessly fast.
+          </div>
+        </div>
+        <!-- Top labels -->
+        <div style="position:absolute;top:40px;left:80px;right:80px;display:flex;justify-content:space-between;font-size:13px;color:var(--ink);font-weight:500;letter-spacing:0.22em;text-transform:uppercase;">
+          <span>&#x25B8; parallel by default</span>
+          <span>streaming &middot; sharp &middot; no bloat</span>
+        </div>
+        <!-- Bottom labels -->
+        <div style="position:absolute;bottom:40px;left:80px;right:80px;display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);letter-spacing:0.22em;text-transform:uppercase;">
+          <span>streaming</span><span>concurrent</span><span>zero-copy</span><span>no bloat</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+    Section 4 — README hero banners (1600x400)
+    ══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">README hero — 1600x400</div>
+  <div class="section-sub">The wide banner that sits at the top of README.md.</div>
+  <div class="row" style="flex-direction:column;">
+
+    <!-- Hero A: Cream + stat block -->
+    <div>
+      <div class="card-label">A — Cream + stat block</div>
+      <div class="card" style="width:1600px;height:400px;background:var(--cream);position:relative;overflow:hidden;">
+        <!-- Speed lines -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" preserveAspectRatio="none">
+          <g transform="rotate(-18 400 200)">
+            <line x1="0" y1="-200" x2="0" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="98" y1="-200" x2="98" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="196" y1="-200" x2="196" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="294" y1="-200" x2="294" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="392" y1="-200" x2="392" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="490" y1="-200" x2="490" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+            <line x1="588" y1="-200" x2="588" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="1.5"/>
+            <line x1="686" y1="-200" x2="686" y2="800" stroke="rgba(26,22,20,0.05)" stroke-width="0.6"/>
+          </g>
+        </svg>
+        <!-- Rust angled bar -->
+        <div style="position:absolute;left:-40px;bottom:-40px;width:1700px;height:16px;background:var(--rust);transform:rotate(-2deg);transform-origin:left;"></div>
+        <!-- Left content -->
+        <div style="position:absolute;top:50%;left:80px;transform:translateY(-50%);display:flex;flex-direction:column;gap:14px;">
+          <span class="wm" style="font-size:220px;color:var(--ink);letter-spacing:-0.05em;">s<span style="color:var(--rust);">3</span>z</span>
+          <div style="font-size:24px;font-weight:500;color:var(--ink-soft);letter-spacing:0.02em;font-style:italic;">
+            // s3 ops. fearlessly fast.
+          </div>
+        </div>
+        <!-- Right stat block -->
+        <div style="position:absolute;top:50%;right:80px;transform:translateY(-50%);background:var(--ink);color:var(--cream);padding:24px 32px;box-shadow:8px 8px 0 var(--rust);line-height:1.4;">
+          <div style="font-size:11px;letter-spacing:0.24em;text-transform:uppercase;color:rgba(243,237,225,0.55);">built in</div>
+          <div style="font-size:40px;font-weight:800;font-style:italic;color:var(--cream);letter-spacing:-0.02em;">
+            rust <span style="color:var(--rust);">&raquo;</span>
+          </div>
+          <div style="font-size:13px;color:rgba(243,237,225,0.6);margin-top:6px;letter-spacing:0.04em;">
+            // memory-safe. zero gc.<br>// no fear.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero B: Dark + rust slash -->
+    <div>
+      <div class="card-label">B — Dark + rust slash</div>
+      <div class="card" style="width:1600px;height:400px;background:var(--ink);position:relative;overflow:hidden;color:var(--cream);">
+        <!-- Speed lines -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" preserveAspectRatio="none">
+          <g transform="rotate(-18 400 200)">
+            <line x1="0" y1="-200" x2="0" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="98" y1="-200" x2="98" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="196" y1="-200" x2="196" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="294" y1="-200" x2="294" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="392" y1="-200" x2="392" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+            <line x1="490" y1="-200" x2="490" y2="800" stroke="rgba(243,237,225,0.04)" stroke-width="1.5"/>
+          </g>
+        </svg>
+        <!-- Right rust bars -->
+        <div style="position:absolute;right:0;top:0;width:6px;height:100%;background:var(--rust);"></div>
+        <div style="position:absolute;right:24px;top:0;width:2px;height:100%;background:var(--rust);opacity:0.5;"></div>
+        <!-- Content -->
+        <div style="position:absolute;top:50%;left:80px;transform:translateY(-50%);display:flex;flex-direction:column;gap:14px;">
+          <span class="wm" style="font-size:220px;color:var(--cream);letter-spacing:-0.05em;">s<span style="color:var(--rust);">3</span>z</span>
+          <div style="font-size:24px;font-weight:500;color:rgba(243,237,225,0.7);letter-spacing:0.02em;font-style:italic;">
+            // s3 ops. fearlessly fast.
+          </div>
+          <div style="display:flex;gap:12px;margin-top:8px;align-items:center;font-size:13px;color:rgba(243,237,225,0.6);letter-spacing:0.2em;text-transform:uppercase;">
+            <span style="color:var(--rust);">&#x25B8;</span> s3 ops &mdash; in rust
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero C: Streams + theme list -->
+    <div>
+      <div class="card-label">C — Streams + theme list</div>
+      <div class="card" style="width:1600px;height:400px;background:var(--ink);position:relative;overflow:hidden;color:var(--cream);">
+        <!-- Parallel streams SVG -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 1600 400" preserveAspectRatio="none" id="streams-hero"></svg>
+        <!-- Wordmark plate -->
+        <div style="position:absolute;top:50%;left:80px;transform:translateY(-50%);background:var(--ink);padding:20px 28px;box-shadow:0 0 0 1.5px rgba(243,237,225,0.5);">
+          <span class="wm" style="font-size:170px;color:var(--cream);letter-spacing:-0.05em;">s<span style="color:var(--rust);">3</span>z</span>
+          <div style="font-size:20px;font-weight:500;color:rgba(243,237,225,0.75);font-style:italic;margin-top:10px;">
+            // s3 ops. fearlessly fast.
+          </div>
+        </div>
+        <!-- Right: theme list -->
+        <div style="position:absolute;top:50%;right:80px;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:500;color:var(--cream);letter-spacing:0.22em;text-transform:uppercase;text-align:right;">
+          <div><span style="color:var(--rust);">&#x2501;&#x2501;</span> speed</div>
+          <div><span style="color:var(--rust);">&#x2501;&#x2501;&#x2501;</span> parallel</div>
+          <div><span style="color:var(--rust);">&#x2501;&#x2501;&#x2501;&#x2501;</span> streaming</div>
+          <div><span style="color:var(--rust);">&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;</span> sharp tooling</div>
+          <div style="color:rgba(243,237,225,0.5);"><span style="color:var(--rust);">&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;&#x2501;</span> no bloat</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+    Section 5 — System notes
+    ══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">The system</div>
+  <div class="section-sub">Type, color, and motif notes — what holds these pieces together.</div>
+  <div class="row">
+
+    <div>
+      <div class="card-label">Type</div>
+      <div class="card tile" style="width:520px;height:360px;background:var(--cream);padding:32px;align-items:flex-start;">
+        <div style="width:100%;display:flex;flex-direction:column;gap:16px;">
+          <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(0,0,0,0.5);">Wordmark</div>
+          <span class="wm" style="font-size:72px;color:var(--ink);">s<span style="color:var(--rust);">3</span>z</span>
+          <div style="font-size:14px;color:var(--ink);line-height:1.7;">
+            <div><b>JetBrains Mono</b> — italic 800, tracking -0.04em</div>
+            <div style="color:rgba(0,0,0,0.6);">fallback: ui-monospace, SFMono-Regular, Menlo</div>
+          </div>
+          <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(0,0,0,0.5);margin-top:12px;">Coloring rule</div>
+          <div style="font-size:14px;color:var(--ink);">
+            <span style="color:var(--ink);">s</span><span style="color:var(--rust);">3</span><span style="color:var(--ink);">z</span>
+            &nbsp;&mdash; middle digit always rust, letters always ink (or cream on dark)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">Color</div>
+      <div class="card tile" style="width:520px;height:360px;background:var(--cream);padding:32px;align-items:flex-start;">
+        <div style="width:100%;display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;background:#c8512a;border:1px solid rgba(0,0,0,0.1);"></div>
+            <div style="font-size:13px;"><div style="font-weight:700;">rust <span style="font-weight:400;color:rgba(0,0,0,0.5);">#c8512a</span></div><div style="color:rgba(0,0,0,0.55);">the 3 / accent only</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;background:#a8401f;border:1px solid rgba(0,0,0,0.1);"></div>
+            <div style="font-size:13px;"><div style="font-weight:700;">rust-deep <span style="font-weight:400;color:rgba(0,0,0,0.5);">#a8401f</span></div><div style="color:rgba(0,0,0,0.55);">shadow / hover</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;background:#1a1614;border:1px solid rgba(0,0,0,0.1);"></div>
+            <div style="font-size:13px;"><div style="font-weight:700;">ink <span style="font-weight:400;color:rgba(0,0,0,0.5);">#1a1614</span></div><div style="color:rgba(0,0,0,0.55);">s, z / dark bg</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;background:#f3ede1;border:1px solid rgba(0,0,0,0.1);"></div>
+            <div style="font-size:13px;"><div style="font-weight:700;">cream <span style="font-weight:400;color:rgba(0,0,0,0.5);">#f3ede1</span></div><div style="color:rgba(0,0,0,0.55);">light bg</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;background:#e3d9c3;border:1px solid rgba(0,0,0,0.1);"></div>
+            <div style="font-size:13px;"><div style="font-weight:700;">cream-deep <span style="font-weight:400;color:rgba(0,0,0,0.5);">#e3d9c3</span></div><div style="color:rgba(0,0,0,0.55);">subtle separators</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card-label">Motifs</div>
+      <div class="card tile" style="width:520px;height:360px;background:var(--cream);padding:32px;align-items:flex-start;">
+        <div style="width:100%;display:flex;flex-direction:column;gap:18px;">
+          <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(0,0,0,0.5);">recurring elements</div>
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:var(--ink);">
+            <div><b style="color:var(--rust);">&#x2501;</b>&nbsp;&nbsp;diagonal speed lines (12-18deg skew)</div>
+            <div><b style="color:var(--rust);">&#x2510;</b>&nbsp;&nbsp;corner registration ticks</div>
+            <div><b style="color:var(--rust);">//</b>&nbsp;&nbsp;rust-style code comments for taglines</div>
+            <div><b style="color:var(--rust);">&#x25A2;</b>&nbsp;&nbsp;hard rectangles, zero rounded corners</div>
+            <div><b style="color:var(--rust);">3</b>&nbsp;&nbsp;the middle digit is the only rust thing</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Generate parallel streams via JS (deterministic, no Math.random) -->
+<script>
+function generateStreams(svgId, w, h, rows, fgColor, accentColor, fgOpacity) {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  const seed = (i, j) => ((i * 73 + j * 31) % 100) / 100;
+  let html = '';
+  for (let i = 0; i < rows; i++) {
+    const y = (i + 1) * (h / (rows + 1));
+    const isAccent = i === Math.floor(rows / 2);
+    let x = 40, j = 0;
+    while (x < w - 40) {
+      const segLen = 30 + Math.floor(seed(i, j) * 180);
+      const gap = 10 + Math.floor(seed(i + 100, j) * 30);
+      const fill = isAccent ? accentColor : fgColor;
+      const op = isAccent ? 0.85 : fgOpacity;
+      html += `<rect x="${x}" y="${y - 1.5}" width="${segLen}" height="3" fill="${fill}" opacity="${op}"/>`;
+      x += segLen + gap;
+      j++;
+    }
+  }
+  svg.innerHTML = html;
+}
+generateStreams('streams-social', 1280, 640, 11, '#1a1614', '#c8512a', 0.22);
+generateStreams('streams-hero', 1600, 400, 11, '#f3ede1', '#c8512a', 0.16);
+</script>
+
+</body>
+</html>
