@@ -14,7 +14,7 @@ use walkdir::WalkDir;
 use crate::{
     auth::Credentials,
     client::S3Client,
-    config::Config,
+    config::{Config, TransferConfig},
     error::{Error, Result},
     http::{ObjectKey, request::build_signed, retry::send_with_retry},
     trace::{maybe_debug, maybe_info},
@@ -314,7 +314,12 @@ async fn upload_single_file(
         })
     } else {
         maybe_debug!(key = %key, size, "multipart upload");
-        let parts_plan = scheduler::plan_parts(size, &config.transfer);
+        let part_size = scheduler::compute_part_size(size, concurrency);
+        let transfer = TransferConfig {
+            part_size,
+            ..config.transfer
+        };
+        let parts_plan = scheduler::plan_parts(size, &transfer);
         let (etag, parts_count) = multipart::upload_multipart(
             http,
             config,
