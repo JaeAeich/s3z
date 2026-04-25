@@ -10,9 +10,19 @@ S3_ENDPOINT_RUSTFS = "http://localhost:9300"
 S3_ENDPOINT_SEAWEEDFS = "http://localhost:9500"
 
 [tasks.bench]
-description = "Run benchmarks (all operations or specify: mise run bench upload)"
+description = "Run full benchmark (all backends, all tools, ~10-15 min)"
 dir = "bench"
-run = "uv run s3z-bench run {{arg(name='ops', var=true)}}"
+run = "uv run s3z-bench run {{arg(name='ops', var=true, default='')}}"
+
+[tasks."bench:compare"]
+description = "Compare latest local run against the dev baseline"
+dir = "bench"
+run = "uv run s3z-bench compare {{arg(name='extra', var=true, default='')}}"
+
+[tasks."bench:dev"]
+description = "Run dev benchmark (minio, s3z+s5cmd+mc, ~3-5 min)"
+dir = "bench"
+run = "uv run s3z-bench run --dev {{arg(name='ops', var=true, default='')}}"
 
 [tasks."bench:fmt"]
 description = "Format the benchmark code"
@@ -22,17 +32,27 @@ run = "uv run ruff format ."
 [tasks."bench:lint"]
 description = "Lint and type-check the benchmark code"
 dir = "bench"
-run = "uv run ruff check . && uv run ruff format --check . && ty check bench/"
+run = "uv run ruff format . && uv run ruff check . && ty check bench/"
+
+[tasks."bench:noise"]
+description = "Characterize harness noise floor (run once per machine)"
+dir = "bench"
+run = "uv run s3z-bench noise {{arg(name='extra', var=true, default='')}}"
 
 [tasks."bench:plot"]
-description = "Generate benchmark charts from latest saved run"
+description = "Plot the latest run (local takes precedence over committed)"
 dir = "bench"
 run = "uv run s3z-bench plot"
 
 [tasks."bench:save"]
-description = "Save latest benchmark run to benchmarks/ for committing"
+description = "Persist latest run (full → benchmarks/, dev → baseline)"
 dir = "bench"
 run = "uv run s3z-bench save"
+
+[tasks."bench:sweep"]
+description = "Run a sweep — pass 'size' or 'concurrency' (e.g. mise run bench:sweep size)"
+dir = "bench"
+run = "uv run s3z-bench sweep {{arg(name='args', var=true, default='')}}"
 
 [tools]
 awscli = "2.34.32"

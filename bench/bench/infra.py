@@ -20,16 +20,24 @@ BACKENDS = [
 ]
 
 
-def start_backends() -> None:
-    """Start all S3 backends via docker compose."""
-    print("  starting backends...")
-    subprocess.run(
-        ["docker", "compose", "-f", str(COMPOSE_FILE), "--profile", "all", "up", "-d"],
-        check=True,
-        capture_output=True,
-    )
+def start_backends(backends: list[Backend] | None = None) -> None:
+    """Start the requested S3 backends via docker compose.
+
+    If `backends` is None, brings up all four. Otherwise brings up only the
+    named subset — saves cold-start time during dev runs that target one
+    backend.
+    """
+    targets = backends if backends is not None else BACKENDS
+    target_names = [b.name for b in targets]
+    print(f"  starting backends: {target_names}")
+    cmd = ["docker", "compose", "-f", str(COMPOSE_FILE)]
+    for name in target_names:
+        cmd.extend(["--profile", name])
+    cmd.extend(["up", "-d"])
+    subprocess.run(cmd, check=True, capture_output=True)
+
     print("  waiting for backends...")
-    for backend in BACKENDS:
+    for backend in targets:
         _wait_healthy(backend.name)
     time.sleep(3)
     print("  all backends healthy.")

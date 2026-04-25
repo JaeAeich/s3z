@@ -29,10 +29,17 @@ ignore = [
   "ERA001",  # commented-out code — future operation stubs
   "ICN001",  # matplotlib import alias — we use it once for .use()
   "ISC001",  # implicit string concat (conflicts with formatter)
+  "PERF203", # try/except in loop — clarity wins for CSV parsing & arg validation
   "PLC0415", # import not at top level — lazy imports are intentional
-  "PLR0913", # too many args — bench_tool is a helper, clarity > brevity
+  "PLR0911", # too many returns — argparse dispatch is naturally branchy
+  "PLR0913", # too many args — bench helpers, clarity > brevity
+  "PLR0915", # too many statements — argparse main() is necessarily long
   "PLR2004", # magic values — fine for CLI arg parsing
   "PLW1510", # subprocess.run without check — we handle returncode manually
+  "PT018",   # composite assert — these are type-narrowing asserts, not pytest
+  "RUF001",  # ambiguous unicode in strings — × and → are intentional in user output
+  "RUF002",  # ambiguous unicode in docstrings — same
+  "S101",    # assert — used for type narrowing, not test logic
   "S603",    # subprocess call with shell=false — intentional
   "S607",    # partial executable path — we check commands exist
   "T201",    # print() — this is a CLI tool

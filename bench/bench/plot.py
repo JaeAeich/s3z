@@ -1,4 +1,10 @@
-"""Benchmark visualization — generates SVGs from saved benchmark results."""
+"""Benchmark visualization — generates SVGs from saved benchmark results.
+
+Charts show mean ± 95% CI half-width (not min/max — those grow with sample
+count and mislead). A second panel renders peak RSS per cell so memory
+regressions are visible alongside wall-time. The chart footer documents which
+tools used which concurrency knobs (parity is not always achievable).
+"""
 
 from __future__ import annotations
 
@@ -18,6 +24,7 @@ from bench import PROJECT_ROOT
 from bench.types import RunMeta
 
 BENCH_DIR = PROJECT_ROOT / "benchmarks"
+LOCAL_BENCH_DIR = PROJECT_ROOT / "target" / "bench"
 PLOTS_DIR = PROJECT_ROOT / "plots"
 
 TOOL_COLORS: dict[str, str] = {
@@ -33,47 +40,59 @@ BG = "#f3ede1"
 
 @dataclass(frozen=True)
 class PlotRow:
-    """A single row of benchmark data for plotting."""
+    """A single (backend, tool) cell, parsed from CSV."""
 
     backend: str
     tool: str
-    min: float
+    n: int
     mean: float
-    max: float
+    median: float
+    stdev: float
+    ci95_half: float
+    rss_mb: float
     total_mb: str
-    runs: str
 
 
-def load_latest() -> tuple[Path, RunMeta]:
-    """Load the latest saved benchmark run."""
-    latest_path = BENCH_DIR / "latest.json"
+def load_run(source: str = "saved") -> tuple[Path, RunMeta]:
+    """Load a benchmark run.
+
+    source = "saved" → benchmarks/latest.json (canonical full runs).
+    source = "local" → target/bench/latest.json (most recent local run).
+    """
+    if source == "saved":
+        latest_path = BENCH_DIR / "latest.json"
+        root = BENCH_DIR
+    elif source == "local":
+        latest_path = LOCAL_BENCH_DIR / "latest.json"
+        root = LOCAL_BENCH_DIR
+    else:
+        msg = f"unknown source: {source}"
+        raise ValueError(msg)
+
     if not latest_path.exists():
-        msg = "No benchmarks/latest.json found. Run 'mise run bench:save' first."
+        msg = f"No {latest_path} found."
         raise FileNotFoundError(msg)
     latest = json.loads(latest_path.read_text())
-    run_dir = BENCH_DIR / str(latest["path"])
+    run_dir = root / str(latest.get("path", latest["run_id"]))
     meta = RunMeta.from_json(run_dir / "meta.json")
     return run_dir, meta
 
 
-def plot_all() -> None:
-    """Generate all available charts."""
-    run_dir, meta = load_latest()
-    print(f"Plotting benchmark: {meta.commit_short} ({meta.date})")
+def plot_all(source: str = "saved") -> None:
+    """Generate all available charts for the latest run from a source."""
+    run_dir, meta = load_run(source)
+    print(f"Plotting benchmark: {meta.commit_short} ({meta.date}) [profile={meta.profile}]")
 
     PLOTS_DIR.mkdir(exist_ok=True)
+    suffix = "" if source == "saved" else f"-{source}"
 
     if (run_dir / "upload.csv").exists():
-        _plot_upload(run_dir, meta)
-
-    # Future operations: add more plotters here.
-    # if (run_dir / "download.csv").exists():
-    #     _plot_download(run_dir, meta)
+        _plot_upload(run_dir, meta, suffix)
 
     print("Done.")
 
 
-def _plot_upload(run_dir: Path, meta: RunMeta) -> None:
+def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str) -> None:
     rows = _read_csv(run_dir / "upload.csv")
     if not rows:
         print("  skip: no valid upload data")
@@ -85,32 +104,78 @@ def _plot_upload(run_dir: Path, meta: RunMeta) -> None:
         t for t in csv_tools if t not in TOOL_ORDER
     ]
     total_mb = rows[0].total_mb
-    runs = rows[0].runs
-    fig, ax = _create_figure()
-    _draw_grouped_bars(ax, rows, backends, tools)
 
-    ax.set_title(
-        f"s3z upload benchmark  //  {total_mb} MB, {runs} runs  //  {meta.commit_short}",
+    fig, (ax_time, ax_rss) = plt.subplots(2, 1, figsize=(12, 9), height_ratios=[3, 2])
+    fig.patch.set_facecolor(BG)
+    ax_time.set_facecolor(BG)
+    ax_rss.set_facecolor(BG)
+
+    _draw_grouped_bars(
+        ax_time,
+        rows,
+        backends,
+        tools,
+        value_attr="mean",
+        err_lo_attr="ci95_half",
+        err_hi_attr="ci95_half",
+        annotate=lambda r: f"{r.mean:.2f}s",
+    )
+    ax_time.set_ylabel("Time (seconds, mean ± 95% CI)", fontsize=11, fontfamily="monospace")
+    ax_time.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
+    ax_time.set_xticklabels([])
+    ax_time.grid(axis="y", alpha=0.3, zorder=0)
+    ax_time.legend(
+        loc="upper right",
+        frameon=True,
+        fancybox=False,
+        edgecolor="#1a1614",
+        fontsize=10,
+        prop={"family": "monospace"},
+    )
+
+    _draw_grouped_bars(
+        ax_rss,
+        rows,
+        backends,
+        tools,
+        value_attr="rss_mb",
+        err_lo_attr=None,
+        err_hi_attr=None,
+        annotate=lambda r: f"{r.rss_mb:.0f}",
+    )
+    ax_rss.set_ylabel("Peak RSS (MB)", fontsize=11, fontfamily="monospace")
+    ax_rss.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
+    ax_rss.grid(axis="y", alpha=0.3, zorder=0)
+
+    for ax in (ax_time, ax_rss):
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_color("#1a1614")
+        ax.spines["bottom"].set_color("#1a1614")
+        ax.tick_params(colors="#1a1614")
+
+    fig.suptitle(
+        f"s3z upload  //  {total_mb} MB  //  {meta.commit_short}  //  profile={meta.profile}",
         fontsize=13,
         fontfamily="monospace",
         fontweight="bold",
-        pad=16,
     )
 
     machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
+    note = "s3z & s5cmd: 32w × 4c configurable  //  mc & aws: tool defaults (no equivalent flags)"
     fig.text(
         0.5,
-        -0.02,
-        machine,
+        0.01,
+        f"{machine}\n{note}",
         ha="center",
         fontsize=9,
         fontfamily="monospace",
         color="#1a1614",
-        alpha=0.5,
+        alpha=0.55,
     )
 
-    plt.tight_layout()
-    out = PLOTS_DIR / "upload.svg"
+    plt.tight_layout(rect=(0, 0.04, 1, 0.97))
+    out = PLOTS_DIR / f"upload{suffix}.svg"
     fig.savefig(out, bbox_inches="tight", facecolor=BG)
     plt.close(fig)
     print(f"  saved: {out}")
@@ -120,34 +185,38 @@ def _read_csv(path: Path) -> list[PlotRow]:
     rows: list[PlotRow] = []
     with path.open() as f:
         for row in csv.DictReader(f):
-            if float(row.get("mean_s", "0")) == 0:
+            try:
+                mean = float(row.get("mean_s", "0") or 0)
+            except ValueError:
+                continue
+            if mean == 0:
                 continue
             rows.append(
                 PlotRow(
                     backend=row["backend"],
                     tool=row["tool"],
-                    min=float(row["min_s"]),
-                    mean=float(row["mean_s"]),
-                    max=float(row["max_s"]),
+                    n=int(row.get("n") or row.get("runs") or 0),
+                    mean=mean,
+                    median=float(row.get("median_s") or mean),
+                    stdev=float(row.get("stdev_s") or 0),
+                    ci95_half=float(row.get("ci95_half_s") or 0),
+                    rss_mb=float(row.get("peak_rss_mb") or 0),
                     total_mb=row.get("total_mb", "?") or "?",
-                    runs=row.get("runs", "?") or "?",
                 )
             )
     return rows
 
 
-def _create_figure() -> tuple[plt.Figure, plt.Axes]:
-    fig, ax = plt.subplots(figsize=(12, 6))
-    fig.patch.set_facecolor(BG)
-    ax.set_facecolor(BG)
-    return fig, ax
-
-
 def _draw_grouped_bars(
-    ax: plt.Axes,
+    ax,  # noqa: ANN001
     rows: list[PlotRow],
     backends: list[str],
     tools: list[str],
+    *,
+    value_attr: str,
+    err_lo_attr: str | None,
+    err_hi_attr: str | None,
+    annotate,  # noqa: ANN001
 ) -> None:
     bar_width = 0.22
     group_gap = 0.15
@@ -155,9 +224,11 @@ def _draw_grouped_bars(
 
     for ti, tool in enumerate(tools):
         xs: list[float] = []
-        means: list[float] = []
+        vals: list[float] = []
         err_lo: list[float] = []
         err_hi: list[float] = []
+        annotations: list[str] = []
+
         for bi, backend in enumerate(backends):
             matched = [r for r in rows if r.backend == backend and r.tool == tool]
             if not matched:
@@ -165,35 +236,37 @@ def _draw_grouped_bars(
             r = matched[0]
             x = bi * (n_tools * bar_width + group_gap) + ti * bar_width
             xs.append(x)
-            means.append(r.mean)
-            err_lo.append(r.mean - r.min)
-            err_hi.append(r.max - r.mean)
+            vals.append(getattr(r, value_attr))
+            err_lo.append(getattr(r, err_lo_attr) if err_lo_attr else 0.0)
+            err_hi.append(getattr(r, err_hi_attr) if err_hi_attr else 0.0)
+            annotations.append(annotate(r))
 
         ax.bar(
             xs,
-            means,
+            vals,
             bar_width,
             color=TOOL_COLORS.get(tool, FALLBACK_COLORS[ti % len(FALLBACK_COLORS)]),
             label=tool,
             zorder=3,
             edgecolor="none",
         )
-        ax.errorbar(
-            xs,
-            means,
-            yerr=[err_lo, err_hi],
-            fmt="none",
-            ecolor="#1a1614",
-            elinewidth=1.2,
-            capsize=3,
-            zorder=4,
-        )
+        if err_lo_attr or err_hi_attr:
+            ax.errorbar(
+                xs,
+                vals,
+                yerr=[err_lo, err_hi],
+                fmt="none",
+                ecolor="#1a1614",
+                elinewidth=1.2,
+                capsize=3,
+                zorder=4,
+            )
 
-        for x, mean, hi in zip(xs, means, err_hi, strict=True):
+        for x, v, hi, txt in zip(xs, vals, err_hi, annotations, strict=True):
             ax.text(
                 x,
-                mean + hi + 0.15,
-                f"{mean:.2f}s",
+                v + hi + (max(vals) * 0.02 if vals else 0.05),
+                txt,
                 ha="center",
                 va="bottom",
                 fontsize=7.5,
@@ -207,20 +280,4 @@ def _draw_grouped_bars(
         for bi in range(len(backends))
     ]
     ax.set_xticks(centers)
-    ax.set_xticklabels(backends, fontfamily="monospace", fontsize=12, fontweight="bold")
-    ax.set_ylabel("Time (seconds)", fontsize=12, fontfamily="monospace")
-    ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
-    ax.grid(axis="y", alpha=0.3, zorder=0)
-    ax.legend(
-        loc="upper right",
-        frameon=True,
-        fancybox=False,
-        edgecolor="#1a1614",
-        fontsize=11,
-        prop={"family": "monospace"},
-    )
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_color("#1a1614")
-    ax.spines["bottom"].set_color("#1a1614")
-    ax.tick_params(colors="#1a1614")
+    ax.set_xticklabels(backends, fontfamily="monospace", fontsize=11, fontweight="bold")
