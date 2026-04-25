@@ -3,6 +3,19 @@ x-credentials: &credentials
   ACCESS_KEY: &access-key "GK000000000000000000000000"
   SECRET_KEY: &secret-key "0000000000000000000000000000000000000000000000000000000000000000"
 
+# Resource limits for reproducible benchmarks. Each backend gets 2 CPUs / 1 GB
+# except SeaweedFS which needs 4 GB (all-in-one mode: master + volume + filer +
+# S3 in one process). Host needs >= 12 GB RAM and 4+ cores.
+x-bench-resources: &bench-resources
+  deploy:
+    resources:
+      limits:
+        cpus: "2"
+        memory: 1G
+      reservations:
+        cpus: "1"
+        memory: 512M
+
 services:
   # --- MinIO (S3 port: 9000) ---
   minio:
@@ -10,6 +23,7 @@ services:
     profiles:
       - minio
       - all
+    <<: *bench-resources
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -47,6 +61,7 @@ services:
     profiles:
       - rustfs
       - all
+    <<: *bench-resources
     command: server /data --console-address ":9301"
     ports:
       - "9300:9000"
@@ -78,11 +93,20 @@ services:
       SECRET_KEY: *secret-key
 
   # --- SeaweedFS (S3 port: 9500) ---
+  # Needs 4 GB — runs master + volume + filer + S3 gateway in one process.
   seaweedfs:
     image: chrislusf/seaweedfs:4.21
     profiles:
       - seaweedfs
       - all
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+        reservations:
+          cpus: "1"
+          memory: 1G
     command: server -dir=/data -filer -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
     ports:
       - "9500:8333"
@@ -114,6 +138,7 @@ services:
     profiles:
       - garage
       - all
+    <<: *bench-resources
     command: /garage server --single-node --default-bucket
     ports:
       - "9700:3900"

@@ -1,0 +1,44 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[dependency-groups]
+dev = ["ruff>=0.11"]
+
+[project]
+dependencies = ["matplotlib>=3.9"]
+description = "Benchmark framework for s3z"
+name = "s3z-bench"
+requires-python = ">=3.10"
+version = "0.1.0"
+
+[project.scripts]
+s3z-bench = "bench.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bench"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+ignore = [
+  "COM812",  # trailing comma (conflicts with formatter)
+  "D",       # pydocstyle — not needed for internal tooling
+  "ERA001",  # commented-out code — future operation stubs
+  "ICN001",  # matplotlib import alias — we use it once for .use()
+  "ISC001",  # implicit string concat (conflicts with formatter)
+  "PLC0415", # import not at top level — lazy imports are intentional
+  "PLR0913", # too many args — bench_tool is a helper, clarity > brevity
+  "PLR2004", # magic values — fine for CLI arg parsing
+  "PLW1510", # subprocess.run without check — we handle returncode manually
+  "S603",    # subprocess call with shell=false — intentional
+  "S607",    # partial executable path — we check commands exist
+  "T201",    # print() — this is a CLI tool
+  "TC003",   # type-checking block — Path is used at runtime in dataclass methods
+]
+select = ["ALL"]
+
+[tool.ty.environment]
+python-version = "3.14"
