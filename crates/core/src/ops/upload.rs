@@ -7,8 +7,8 @@ use std::{
     sync::Arc,
 };
 
-use bytes::Bytes;
 use tokio::fs;
+use tokio_util::io::ReaderStream;
 use walkdir::WalkDir;
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
     client::S3Client,
     config::{Config, TransferConfig},
     error::{Error, Result},
-    http::{ObjectKey, request::build_signed, retry::send_with_retry},
+    http::{ObjectKey, request::build_signed_unsigned_payload, retry::send_with_retry_stream},
     trace::{maybe_debug, maybe_info},
     transfer::{multipart, pool, scheduler},
 };
@@ -229,15 +229,38 @@ fn expand_sources(sources: &[PathBuf], prefix: &str) -> Result<Vec<(PathBuf, Obj
     Ok(entries)
 }
 
-/// Single PUT upload for small files.
+/// Buffer size for the streaming `ReaderStream` (256 KiB).
+const STREAM_BUFFER_SIZE: usize = 256 * 1024;
+
+/// Single PUT upload for small files, streamed from disk.
+///
+/// Uses `UNSIGNED-PAYLOAD` signing and streams the file through a 256 KiB
+/// buffer — peak memory per worker is 256 KiB regardless of file size.
 async fn single_put(
     http: &reqwest::Client, config: &Config, creds: &Credentials, bucket: &str, key: &ObjectKey,
-    body: Vec<u8>,
+    path: &Path, size: u64,
 ) -> Result<(String, u32)> {
     let uri: http::Uri = format!("{}/{bucket}/{}", config.endpoint_url(), key.encoded()).parse()?;
 
-    let req = build_signed(http::Method::PUT, uri, Bytes::from(body), creds, &config.region)?;
-    let resp = send_with_retry(http, req, &config.retry).await?;
+    let resp = send_with_retry_stream(
+        http,
+        || {
+            let u = uri.clone();
+            let c = creds.clone();
+            let r = config.region.clone();
+            async move { build_signed_unsigned_payload(http::Method::PUT, u, size, &c, &r) }
+        },
+        || {
+            let p = path.to_owned();
+            async move {
+                let file = fs::File::open(&p).await?;
+                let stream = ReaderStream::with_capacity(file, STREAM_BUFFER_SIZE);
+                Ok(reqwest::Body::wrap_stream(stream))
+            }
+        },
+        &config.retry,
+    )
+    .await?;
 
     let etag = resp
         .headers()
@@ -272,9 +295,8 @@ async fn upload_single_file(
     let file_start = std::time::Instant::now();
 
     if size <= config.transfer.multipart_threshold {
-        maybe_debug!(key = %key, size, "single PUT");
-        let body = fs::read(path).await?;
-        let (etag, parts) = single_put(http, config, creds, bucket, key, body).await?;
+        maybe_debug!(key = %key, size, "single PUT (streaming)");
+        let (etag, parts) = single_put(http, config, creds, bucket, key, path, size).await?;
 
         #[cfg(feature = "tracing")]
         let elapsed = file_start.elapsed();
