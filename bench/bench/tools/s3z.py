@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from bench import PROJECT_ROOT
 
 if TYPE_CHECKING:
-    from bench.types import Backend, ListCmd, UploadCmd
+    from bench.types import Backend, DownloadCmd, ListCmd, UploadCmd
 
 
 def _build_s3z() -> Path:
@@ -52,6 +52,24 @@ class S3zTool:
         if params.concurrency > 0:
             cmd.extend(["-c", str(params.concurrency)])
         return cmd
+
+    def download_cmd(self, backend: Backend, params: DownloadCmd) -> list[str]:
+        binary = self._ensure_built()
+        return [
+            str(binary),
+            "-e",
+            backend.endpoint,
+            "-r",
+            backend.region,
+            "download",
+            "-b",
+            params.bucket,
+            "-p",
+            params.prefix,
+            "-d",
+            str(params.dest_dir),
+            "-q",
+        ]
 
     def list_cmd(self, backend: Backend, params: ListCmd) -> list[str]:
         binary = self._ensure_built()

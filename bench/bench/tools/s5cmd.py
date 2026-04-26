@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bench.types import Backend, ListCmd, UploadCmd
+    from bench.types import Backend, DownloadCmd, ListCmd, UploadCmd
 
 
 @dataclass
@@ -35,6 +35,16 @@ class S5cmdTool:
             ]
         )
         return cmd
+
+    def download_cmd(self, backend: Backend, params: DownloadCmd) -> list[str]:
+        return [
+            "s5cmd",
+            "--endpoint-url",
+            backend.endpoint,
+            "cp",
+            f"s3://{params.bucket}/{params.prefix}*",
+            str(params.dest_dir),
+        ]
 
     def list_cmd(self, backend: Backend, params: ListCmd) -> list[str]:
         return [

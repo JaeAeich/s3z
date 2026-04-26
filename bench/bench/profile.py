@@ -37,7 +37,7 @@ PROFILES: dict[str, Profile] = {
     "dev": Profile(
         name="dev",
         backends=("minio", "rustfs", "seaweedfs", "garage"),
-        tools=("s3z",),
+        tools=("s3z", "mc"),
         file_count=3,
         file_size_mb=128,
         workers=32,

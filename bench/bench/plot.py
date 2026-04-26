@@ -94,6 +94,9 @@ def plot_all(source: str = "saved") -> None:
     if (run_dir / "list.csv").exists():
         _plot_list(run_dir, meta, suffix)
 
+    if (run_dir / "download.csv").exists():
+        _plot_download(run_dir, meta, suffix)
+
     print("Done.")
 
 
@@ -268,6 +271,94 @@ def _plot_list(run_dir: Path, meta: RunMeta, suffix: str) -> None:
 
     plt.tight_layout(rect=(0, 0.03, 1, 0.97))
     out = PLOTS_DIR / f"list{suffix}.svg"
+    fig.savefig(out, bbox_inches="tight", facecolor=BG)
+    plt.close(fig)
+    print(f"  saved: {out}")
+
+
+def _plot_download(run_dir: Path, meta: RunMeta, suffix: str) -> None:
+    rows = _read_csv(run_dir / "download.csv")
+    if not rows:
+        print("  skip: no valid download data")
+        return
+
+    backends = list(dict.fromkeys(r.backend for r in rows))
+    csv_tools = list(dict.fromkeys(r.tool for r in rows))
+    tools = [t for t in TOOL_ORDER if t in csv_tools] + [
+        t for t in csv_tools if t not in TOOL_ORDER
+    ]
+    total_mb = rows[0].total_mb
+
+    fig, (ax_time, ax_rss) = plt.subplots(2, 1, figsize=(12, 9), height_ratios=[3, 2])
+    fig.patch.set_facecolor(BG)
+    ax_time.set_facecolor(BG)
+    ax_rss.set_facecolor(BG)
+
+    _draw_grouped_bars(
+        ax_time,
+        rows,
+        backends,
+        tools,
+        value_attr="mean",
+        err_lo_attr="ci95_half",
+        err_hi_attr="ci95_half",
+        annotate=lambda r: f"{r.mean:.2f}s",
+    )
+    ax_time.set_ylabel("Time (seconds, mean ± 95% CI)", fontsize=11, fontfamily="monospace")
+    ax_time.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
+    ax_time.set_xticklabels([])
+    ax_time.grid(axis="y", alpha=0.3, zorder=0)
+    ax_time.legend(
+        loc="upper right",
+        frameon=True,
+        fancybox=False,
+        edgecolor="#1a1614",
+        fontsize=10,
+        prop={"family": "monospace"},
+    )
+
+    _draw_grouped_bars(
+        ax_rss,
+        rows,
+        backends,
+        tools,
+        value_attr="rss_mb",
+        err_lo_attr=None,
+        err_hi_attr=None,
+        annotate=lambda r: f"{r.rss_mb:.0f}",
+    )
+    ax_rss.set_ylabel("Peak RSS (MB)", fontsize=11, fontfamily="monospace")
+    ax_rss.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
+    ax_rss.grid(axis="y", alpha=0.3, zorder=0)
+
+    for ax in (ax_time, ax_rss):
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_color("#1a1614")
+        ax.spines["bottom"].set_color("#1a1614")
+        ax.tick_params(colors="#1a1614")
+
+    fig.suptitle(
+        f"s3z download  //  {total_mb} MB  //  {meta.commit_short}  //  profile={meta.profile}",
+        fontsize=13,
+        fontfamily="monospace",
+        fontweight="bold",
+    )
+
+    machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
+    fig.text(
+        0.5,
+        0.01,
+        machine,
+        ha="center",
+        fontsize=9,
+        fontfamily="monospace",
+        color="#1a1614",
+        alpha=0.55,
+    )
+
+    plt.tight_layout(rect=(0, 0.03, 1, 0.97))
+    out = PLOTS_DIR / f"download{suffix}.svg"
     fig.savefig(out, bbox_inches="tight", facecolor=BG)
     plt.close(fig)
     print(f"  saved: {out}")

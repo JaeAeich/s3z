@@ -45,6 +45,15 @@ def quantile(values: list[float], q: float) -> float:
 
 
 @dataclass(frozen=True)
+class DownloadCmd:
+    """Parameters for building a download command."""
+
+    bucket: str
+    prefix: str
+    dest_dir: Path
+
+
+@dataclass(frozen=True)
 class ListCmd:
     """Parameters for building a list command."""
 
