@@ -251,12 +251,18 @@ async fn run_download_workers(
     Ok(())
 }
 
+/// Write buffer capacity — network chunks (~16 KiB from reqwest) are
+/// accumulated here and flushed in a single `pwrite` once full.
+/// 512 KiB keeps `spawn_blocking` calls at ~2K/GB (vs 64K/GB unbuffered)
+/// while bounding per-part memory (8 concurrent parts × 512 KiB = 4 MiB).
+const WRITE_BUF_SIZE: usize = 512 * 1024;
+
 /// Download a single Range part and write it to the correct file offset.
 ///
-/// Uses `write_all_at` (pwrite) on the shared fd — a positioned write that
-/// does not modify the fd's internal offset. This is safe for concurrent
-/// use from multiple tasks because each task writes to a non-overlapping
-/// byte range and pwrite is atomic with respect to offset.
+/// Buffers incoming network chunks (typically ~16 KiB each) into a
+/// [`WRITE_BUF_SIZE`] buffer and issues a single `pwrite` per buffer-full.
+/// This amortises the `spawn_blocking` + syscall overhead: a 256 MiB part
+/// produces ~1 K pwrite calls instead of ~16 K.
 async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
     debug_assert!(job.size > 0, "zero-size part would underflow range calculation");
     #[expect(
@@ -283,20 +289,35 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
 
     let fd = Arc::clone(&ctx.fd);
     let mut write_offset = job.offset;
+    let mut buf = Vec::with_capacity(WRITE_BUF_SIZE);
     let mut stream = resp.bytes_stream();
+
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
-        let len = chunk.len();
+        buf.extend_from_slice(&chunk);
+
+        if buf.len() >= WRITE_BUF_SIZE {
+            let data = std::mem::replace(&mut buf, Vec::with_capacity(WRITE_BUF_SIZE));
+            let data_len = data.len();
+            let offset = write_offset;
+            let fd_ref = Arc::clone(&fd);
+            task::spawn_blocking(move || fd_ref.write_all_at(&data, offset))
+                .await
+                .map_err(|e| Error::Internal(e.to_string()))??;
+            #[expect(clippy::arithmetic_side_effects, reason = "write_offset bounded by file size")]
+            {
+                write_offset += u64::try_from(data_len).unwrap_or(u64::MAX);
+            }
+        }
+    }
+
+    // Flush remaining bytes.
+    if !buf.is_empty() {
         let offset = write_offset;
         let fd_ref = Arc::clone(&fd);
-        // pwrite via spawn_blocking — positioned write, no seek needed.
-        task::spawn_blocking(move || fd_ref.write_all_at(&chunk, offset))
+        task::spawn_blocking(move || fd_ref.write_all_at(&buf, offset))
             .await
             .map_err(|e| Error::Internal(e.to_string()))??;
-        #[expect(clippy::arithmetic_side_effects, reason = "write_offset bounded by file size")]
-        {
-            write_offset += u64::try_from(len).unwrap_or(u64::MAX);
-        }
     }
 
     Ok(())

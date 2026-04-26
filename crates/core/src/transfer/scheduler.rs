@@ -44,6 +44,10 @@ pub(crate) fn compute_part_size(file_size: u64, concurrency: usize) -> u64 {
 /// Downloads benefit less from pipeline headroom than uploads because
 /// the server pushes data immediately. Fewer parts means fewer HTTP
 /// Range requests, each of which carries signing and round-trip overhead.
+///
+/// Unlike uploads, S3 imposes no upper limit on Range request sizes,
+/// so there is no max cap — a 10 GB file with concurrency=8 produces
+/// 8 × 1.25 GB parts rather than 40 × 256 MB parts.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "target_parts is ≥1, so division cannot panic; all values are bounded by constants"
@@ -55,7 +59,9 @@ pub(crate) fn compute_download_part_size(file_size: u64, concurrency: usize) -> 
     let target_parts = concurrency_u64.max(1);
     let size_for_concurrency = file_size / target_parts;
 
-    size_for_concurrency.max(size_floor).clamp(MIN_PART_SIZE, MAX_PART_SIZE)
+    // Only enforce the minimum (8 MiB). No upper cap — Range requests
+    // have no S3-imposed size limit, and fewer requests is better.
+    size_for_concurrency.max(size_floor).max(MIN_PART_SIZE)
 }
 
 /// Plan the parts for a file of the given size.
@@ -233,6 +239,13 @@ mod tests {
         let ul = compute_part_size(256 * MB, 4);
         let dl = compute_download_part_size(256 * MB, 4);
         assert!(dl > ul, "download parts should be larger (fewer requests)");
+    }
+
+    #[test]
+    fn download_large_file_no_upper_cap() {
+        // 10GB / 8 = 1.25GB — no 256MB cap for downloads
+        let ps = compute_download_part_size(10 * 1024 * MB, 8);
+        assert_eq!(ps, 1280 * MB);
     }
 
     #[test]
