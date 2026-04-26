@@ -331,7 +331,10 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
     let uri: Uri =
         format!("{}/{}/{}", ctx.config.endpoint_url(), ctx.bucket, ctx.key.encoded()).parse()?;
 
-    maybe_debug!(key = %ctx.key, part = job.number, offset = job.offset, size = job.size, "downloading part");
+    maybe_debug!(
+        key = %ctx.key, part = job.number, offset = job.offset, size = job.size,
+        "downloading part"
+    );
 
     let mut signed = build_signed(Method::GET, uri, Bytes::new(), &ctx.creds, &ctx.config.region)?;
     signed.headers_mut().insert(

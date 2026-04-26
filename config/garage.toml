@@ -12,4 +12,4 @@ api_bind_addr = "[::]:3903"
 
 [s3_api]
 api_bind_addr = "[::]:3900"
-s3_region = "garage"
+s3_region = "us-east-1"
