@@ -258,9 +258,11 @@ async fn schedule_parts(parts: Vec<Part>, file_path: Arc<PathBuf>, tx: mpsc::Sen
 
 /// Spawn N upload workers, collect results.
 ///
-/// Uses `tokio::select!` to simultaneously wait for completed uploads and
-/// new jobs from the scheduler, keeping exactly `concurrency` tasks in
-/// flight at all times.
+/// A single `tokio::select!` races job reception against task completion
+/// so that neither side blocks the other. A split design (blocking recv
+/// in a fill loop + select for steady state) starves the `JoinSet`: when
+/// a task completes and the loop re-enters the blocking `recv().await`,
+/// other completions queue up unprocessed until the channel produces.
 async fn run_upload_workers(
     ctx: &Arc<UploadCtx>, mut rx: mpsc::Receiver<PartJob>, concurrency: usize, total_parts: usize,
 ) -> Result<Vec<PartResult>> {
@@ -269,25 +271,14 @@ async fn run_upload_workers(
     let mut channel_open = true;
 
     loop {
-        // Spawn up to `concurrency` tasks while jobs are available.
-        while channel_open && set.len() < concurrency {
-            match rx.recv().await {
-                Some(job) => {
-                    let c = Arc::clone(ctx);
-                    set.spawn(async move { upload_part_streaming(&c, job).await });
-                },
-                None => {
-                    channel_open = false;
-                },
-            }
-        }
-
-        if set.is_empty() {
+        if set.is_empty() && !channel_open {
             break;
         }
 
-        // Wait for a completed upload, and optionally receive a new job.
+        let has_capacity = channel_open && set.len() < concurrency;
+
         tokio::select! {
+            // Always harvest completed tasks.
             Some(handle) = set.join_next() => {
                 match handle.map_err(|e| Error::Internal(e.to_string()))? {
                     Ok(result) => results.push(result),
@@ -298,9 +289,17 @@ async fn run_upload_workers(
                     },
                 }
             }
-            Some(job) = rx.recv(), if channel_open && set.len() >= concurrency => {
-                let c = Arc::clone(ctx);
-                set.spawn(async move { upload_part_streaming(&c, job).await });
+            // Accept new jobs only when we have spare concurrency slots.
+            job = rx.recv(), if has_capacity => {
+                match job {
+                    Some(job) => {
+                        let c = Arc::clone(ctx);
+                        set.spawn(async move { upload_part_streaming(&c, job).await });
+                    },
+                    None => {
+                        channel_open = false;
+                    },
+                }
             }
             else => break,
         }

@@ -30,10 +30,16 @@ impl S3Client {
     pub fn new(config: Config) -> Result<Self> {
         let creds = auth::resolve(&config.credentials)?;
 
+        // tcp_nodelay: disable Nagle so 256 KiB streaming writes don't
+        // interact with TCP delayed-ACK (~40 ms stalls per chunk).
+        // http1_only: S3 backends speak HTTP/1.1; skip ALPN negotiation
+        // to avoid an extra round trip on every new connection.
         let http = reqwest::Client::builder()
             .pool_max_idle_per_host(TransferConfig::MAX_IDLE_CONNECTIONS)
             .tcp_keepalive(Duration::from_secs(30))
             .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_nodelay(true)
+            .http1_only()
             .build()?;
 
         Ok(Self {

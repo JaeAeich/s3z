@@ -1,6 +1,6 @@
 //! HTTP retry logic with exponential backoff.
 
-use core::future::Future;
+use core::{future::Future, time::Duration};
 
 use bytes::Bytes;
 use tokio::time::sleep;
@@ -11,6 +11,31 @@ use crate::{
     http::response,
     trace::{maybe_debug, maybe_warn},
 };
+
+/// Equal jitter: `base/2 + rand(0 .. base/2)`.
+///
+/// Avoids retry thundering herds when many workers are throttled
+/// simultaneously. Uses system-time nanos as cheap entropy — sufficient
+/// for backoff jitter where cryptographic randomness is irrelevant.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "half + jitter cannot overflow: jitter < half+1 ≤ nanos/2+1, and half ≤ nanos/2"
+)]
+fn jittered(base: Duration) -> Duration {
+    let nanos = base.as_nanos();
+    if nanos <= 1 {
+        return base;
+    }
+    let half = nanos / 2;
+    let entropy = u128::from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .subsec_nanos(),
+    );
+    let jitter = entropy % half.saturating_add(1);
+    Duration::from_nanos(u64::try_from(half + jitter).unwrap_or(u64::MAX))
+}
 
 /// Classify a response and either return it or extract a retryable error.
 enum Outcome {
@@ -62,10 +87,11 @@ async fn send_retry_loop(
     let mut last_err = None;
     let mut delay = policy.base_delay;
     let attempts = policy.max_retries.saturating_add(1);
+    let uri_string = uri.to_string();
 
     for attempt in 0..attempts {
         let reqwest_req = http
-            .request(method.clone(), uri.to_string())
+            .request(method.clone(), &uri_string)
             .headers(headers.clone())
             .body(body.clone())
             .build()?;
@@ -107,8 +133,9 @@ async fn send_retry_loop(
         }
 
         if attempt.saturating_add(1) < attempts {
-            maybe_debug!(?delay, "backing off");
-            sleep(delay).await;
+            let jittered_delay = jittered(delay);
+            maybe_debug!(?jittered_delay, "backing off");
+            sleep(jittered_delay).await;
             delay = delay.saturating_mul(2).min(policy.max_delay);
         }
     }
@@ -186,8 +213,9 @@ where
         }
 
         if attempt.saturating_add(1) < attempts {
-            maybe_debug!(?delay, "backing off");
-            sleep(delay).await;
+            let jittered_delay = jittered(delay);
+            maybe_debug!(?jittered_delay, "backing off");
+            sleep(jittered_delay).await;
             delay = delay.saturating_mul(2).min(policy.max_delay);
         }
     }
