@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     let config = cli::build_config(&cli);
-    let client = S3Client::new(config)?;
+    let client = S3Client::new(config).await?;
 
     match &cli.command {
         Command::Upload(args) => commands::upload::run(&client, args, cli.quiet).await?,

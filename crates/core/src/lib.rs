@@ -11,7 +11,7 @@
 //! use s3z::{Config, S3Client, UploadRequest, auth::CredentialSource};
 //!
 //! # async fn example() -> s3z::error::Result<()> {
-//! let client = S3Client::new(Config::new("us-east-1", CredentialSource::Env))?;
+//! let client = S3Client::new(Config::new("us-east-1", CredentialSource::Env)).await?;
 //!
 //! let result =
 //!     client.upload(UploadRequest::new(vec!["./data".into()], "my-bucket", "uploads/")).await?;
