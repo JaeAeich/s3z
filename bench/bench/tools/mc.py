@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bench.types import Backend, UploadCmd
+    from bench.types import Backend, ListCmd, UploadCmd
 
 
 @dataclass
@@ -21,6 +21,14 @@ class McTool:
             "cp",
             "--recursive",
             f"{params.data_dir}/",
+            f"bench_{backend.name}/{params.bucket}/{params.prefix}",
+        ]
+
+    def list_cmd(self, backend: Backend, params: ListCmd) -> list[str]:
+        return [
+            "mc",
+            "ls",
+            "--recursive",
             f"bench_{backend.name}/{params.bucket}/{params.prefix}",
         ]
 

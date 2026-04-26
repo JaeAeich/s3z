@@ -6,12 +6,30 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bench.types import Backend, UploadCmd
+    from bench.types import Backend, ListCmd, UploadCmd
 
 
 @dataclass
 class AwsTool:
     name: str = "aws"
+
+    def list_cmd(self, backend: Backend, params: ListCmd) -> list[str]:
+        return [
+            "aws",
+            "s3api",
+            "list-objects-v2",
+            "--bucket",
+            params.bucket,
+            "--prefix",
+            params.prefix,
+            "--endpoint-url",
+            backend.endpoint,
+            "--region",
+            backend.region,
+            "--no-paginate",
+            "--output",
+            "json",
+        ]
 
     def upload_cmd(self, backend: Backend, params: UploadCmd) -> list[str]:
         return [

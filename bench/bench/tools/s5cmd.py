@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bench.types import Backend, UploadCmd
+    from bench.types import Backend, ListCmd, UploadCmd
 
 
 @dataclass
@@ -14,17 +14,35 @@ class S5cmdTool:
     name: str = "s5cmd"
 
     def upload_cmd(self, backend: Backend, params: UploadCmd) -> list[str]:
+        cmd = [
+            "s5cmd",
+            "--endpoint-url",
+            backend.endpoint,
+        ]
+        if params.workers > 0:
+            cmd.extend(["--numworkers", str(params.workers)])
+        cmd.extend(
+            [
+                "cp",
+            ]
+        )
+        if params.concurrency > 0:
+            cmd.extend(["--concurrency", str(params.concurrency)])
+        cmd.extend(
+            [
+                f"{params.data_dir}/*",
+                f"s3://{params.bucket}/{params.prefix}",
+            ]
+        )
+        return cmd
+
+    def list_cmd(self, backend: Backend, params: ListCmd) -> list[str]:
         return [
             "s5cmd",
             "--endpoint-url",
             backend.endpoint,
-            "--numworkers",
-            str(params.workers),
-            "cp",
-            "--concurrency",
-            str(params.concurrency),
-            f"{params.data_dir}/*",
-            f"s3://{params.bucket}/{params.prefix}",
+            "ls",
+            f"s3://{params.bucket}/{params.prefix}*",
         ]
 
     def env(self, backend: Backend) -> dict[str, str] | None:

@@ -48,8 +48,8 @@ class UploadOp:
             data_dir=self.data_dir,
             bucket=BUCKET,
             prefix=PREFIX,
-            workers=profile.workers,
-            concurrency=profile.concurrency,
+            workers=0,
+            concurrency=0,
         )
 
     def csv_config(self, params: UploadCmd) -> dict[str, object]:
@@ -57,8 +57,8 @@ class UploadOp:
             "files": self.file_count,
             "file_size_mb": self.file_size_mb,
             "total_mb": self.file_count * self.file_size_mb,
-            "workers": params.workers,
-            "concurrency": params.concurrency,
+            "workers": params.workers or "default",
+            "concurrency": params.concurrency or "default",
         }
 
     def reset(self, backend: Backend, params: UploadCmd) -> None:

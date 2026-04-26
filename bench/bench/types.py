@@ -44,16 +44,24 @@ def quantile(values: list[float], q: float) -> float:
     return s[lo] + (s[hi] - s[lo]) * (k - lo)
 
 
+@dataclass(frozen=True)
+class ListCmd:
+    """Parameters for building a list command."""
+
+    bucket: str
+    prefix: str
+    expected_keys: int
+
+
 class Tool(Protocol):
     """A CLI tool that can be benchmarked.
 
-    Required: name, upload_cmd.
+    Required: name.
+    Optional per-op: upload_cmd, list_cmd.
     Optional: env (return extra env vars), setup (one-time init before runs).
     """
 
     name: str
-
-    def upload_cmd(self, backend: Backend, params: UploadCmd) -> list[str]: ...
 
 
 @dataclass

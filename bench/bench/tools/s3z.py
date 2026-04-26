@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from bench import PROJECT_ROOT
 
 if TYPE_CHECKING:
-    from bench.types import Backend, UploadCmd
+    from bench.types import Backend, ListCmd, UploadCmd
 
 
 def _build_s3z() -> Path:
@@ -31,7 +31,7 @@ class S3zTool:
 
     def upload_cmd(self, backend: Backend, params: UploadCmd) -> list[str]:
         binary = self._ensure_built()
-        return [
+        cmd = [
             str(binary),
             "-e",
             backend.endpoint,
@@ -43,10 +43,29 @@ class S3zTool:
             params.bucket,
             "-p",
             params.prefix,
-            "-w",
-            str(params.workers),
-            "-c",
-            str(params.concurrency),
+            "-q",
+        ]
+        # Only pass -w/-c when the harness requests specific values (sweeps).
+        # Regular benchmarks leave them at 0 → s3z uses its built-in defaults.
+        if params.workers > 0:
+            cmd.extend(["-w", str(params.workers)])
+        if params.concurrency > 0:
+            cmd.extend(["-c", str(params.concurrency)])
+        return cmd
+
+    def list_cmd(self, backend: Backend, params: ListCmd) -> list[str]:
+        binary = self._ensure_built()
+        return [
+            str(binary),
+            "-e",
+            backend.endpoint,
+            "-r",
+            backend.region,
+            "ls",
+            "-b",
+            params.bucket,
+            "-p",
+            params.prefix,
             "-q",
         ]
 
