@@ -2,13 +2,10 @@
 
 use core::time::Duration;
 
-use tokio::task::JoinSet;
-
 use crate::{
     auth::{self, Credentials},
     config::{Config, TransferConfig},
     error::Result,
-    trace::maybe_debug,
 };
 
 /// The s3z S3 client.
@@ -24,12 +21,17 @@ pub struct S3Client {
 impl S3Client {
     /// Create a new client with the given configuration.
     ///
+    /// The connection pool grows on demand — no eager warmup. The first
+    /// operation pays ~2 ms per new TCP connection, which is negligible
+    /// compared to S3 round-trip latency.
+    ///
     /// # Errors
     ///
     /// Returns an error if credential resolution fails (e.g.
     /// [`crate::auth::CredentialSource::Env`] and the env vars are missing)
     /// or if the HTTP client cannot be built.
     #[inline]
+    #[expect(clippy::unused_async, reason = "API is async-ready for future credential refresh")]
     pub async fn new(config: Config) -> Result<Self> {
         let creds = auth::resolve(&config.credentials)?;
 
@@ -45,32 +47,10 @@ impl S3Client {
             .http1_only()
             .build()?;
 
-        let client = Self {
+        Ok(Self {
             config,
             creds,
             http,
-        };
-
-        client.warmup_pool().await;
-        Ok(client)
-    }
-
-    /// Pre-establish TCP connections so the first operation doesn't
-    /// stall on sequential connection setup (~2 ms each).
-    async fn warmup_pool(&self) {
-        let count = TransferConfig::MAX_IDLE_CONNECTIONS;
-        let uri = self.config.endpoint_url().to_owned();
-        let mut set = JoinSet::new();
-
-        for _ in 0..count {
-            let client = self.http.clone();
-            let u = uri.clone();
-            set.spawn(async move {
-                drop(client.head(&u).send().await);
-            });
-        }
-
-        while set.join_next().await.is_some() {}
-        maybe_debug!(connections = count, "connection pool warmed");
+        })
     }
 }
