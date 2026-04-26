@@ -1,4 +1,5 @@
 [workspace]
+exclude = ["examples/rust"]
 members = ["crates/*"]
 resolver = "2"
 
@@ -10,13 +11,20 @@ bytes = "1"
 clap = { features = ["derive", "env"], version = "4" }
 futures-util = "0.3"
 http = "1"
-indicatif = "0.17"
+indicatif = "0.18"
+napi = { features = ["async", "napi9"], version = "3" }
+napi-build = "2"
+napi-derive = "3"
 percent-encoding = "2"
-quick-xml = { features = ["serialize"], version = "0.37" }
+pyo3 = { features = [
+  "experimental-inspect",
+  "extension-module",
+], version = "0.28" }
+quick-xml = { features = ["serialize"], version = "0.39" }
 reqwest = { default-features = false, features = [
-  "rustls-tls",
+  "rustls",
   "stream",
-], version = "0.12" }
+], version = "0.13" }
 serde = { features = ["derive"], version = "1" }
 tempfile = "3"
 thiserror = "2"
