@@ -8,7 +8,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use tokio::{fs, task::JoinSet};
+use tokio::fs;
 use walkdir::WalkDir;
 
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
     error::{Error, Result},
     http::{ObjectKey, request::build_signed, retry::send_with_retry},
     trace::{maybe_debug, maybe_info},
-    transfer::{multipart, scheduler},
+    transfer::{multipart, pool, scheduler},
 };
 
 /// Callback invoked after each file upload completes successfully.
@@ -145,8 +145,9 @@ impl S3Client {
     /// individual file upload fails.
     #[inline]
     pub async fn upload(&self, req: UploadRequest) -> Result<UploadResult> {
-        let creds = self.creds.clone();
         let entries = expand_sources(&req.sources, &req.dest_prefix)?;
+
+        #[cfg(feature = "tracing")]
         let total = entries.len();
         maybe_info!(
             files = total,
@@ -157,62 +158,36 @@ impl S3Client {
             "starting upload batch"
         );
 
-        let mut set = JoinSet::new();
-        let mut entries_iter = entries.into_iter();
-        let mut files = Vec::with_capacity(total);
+        let http = self.http.clone();
+        let config = self.config.clone();
+        let creds = self.creds.clone();
+        let bucket = req.dest_bucket.clone();
+        let concurrency = req.concurrency_per_file;
 
-        // Seed the JoinSet with up to `workers` initial tasks.
-        for (path, key) in entries_iter.by_ref().take(req.workers) {
-            spawn_upload(&mut set, &self.http, &self.config, &creds, &req, &path, &key);
-        }
+        let on_complete: Option<&(dyn Fn(&FileUploadResult) + Send + Sync)> =
+            req.on_file_complete.as_deref();
 
-        // Collect completed results and spawn replacements to maintain
-        // `workers` in-flight tasks. This ensures the progress callback
-        // fires as each file finishes, not all at the end.
-        loop {
-            let Some(handle) = set.join_next().await else {
-                break;
-            };
-
-            match handle.map_err(|e| Error::Internal(e.to_string()))? {
-                Ok(result) => {
-                    if let Some(cb) = &req.on_file_complete {
-                        cb(&result);
+        let files =
+            pool::run_pool(
+                entries,
+                req.workers,
+                |(path, key)| {
+                    let http = http.clone();
+                    let cfg = config.clone();
+                    let cr = creds.clone();
+                    let bkt = bucket.clone();
+                    async move {
+                        upload_single_file(&http, &cfg, &cr, &bkt, &key, &path, concurrency).await
                     }
-                    files.push(result);
                 },
-                Err(e) => {
-                    set.abort_all();
-                    return Err(e);
-                },
-            }
-
-            // Spawn the next entry now that a slot freed up.
-            if let Some((path, key)) = entries_iter.next() {
-                spawn_upload(&mut set, &self.http, &self.config, &creds, &req, &path, &key);
-            }
-        }
+                on_complete,
+            )
+            .await?;
 
         Ok(UploadResult {
             files,
         })
     }
-}
-
-/// Spawn a single-file upload task into the [`JoinSet`].
-fn spawn_upload(
-    set: &mut JoinSet<Result<FileUploadResult>>, http: &reqwest::Client, config: &Config,
-    creds: &Credentials, req: &UploadRequest, path: &Path, key: &ObjectKey,
-) {
-    let client = http.clone();
-    let cfg = config.clone();
-    let cr = creds.clone();
-    let bkt = req.dest_bucket.clone();
-    let conc = req.concurrency_per_file;
-    let path = path.to_owned();
-    let key = key.clone();
-
-    set.spawn(async move { upload_single_file(&client, &cfg, &cr, &bkt, &key, &path, conc).await });
 }
 
 /// Expand sources into a flat list of `(local_path, object_key)` pairs.

@@ -2,4 +2,5 @@
 
 pub(crate) mod multipart;
 pub(crate) mod part;
+pub(crate) mod pool;
 pub(crate) mod scheduler;
