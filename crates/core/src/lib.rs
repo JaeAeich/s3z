@@ -51,4 +51,7 @@ mod transfer;
 pub use client::S3Client;
 pub use config::Config;
 pub use http::ObjectKey;
-pub use ops::upload::{FileUploadResult, UploadRequest, UploadResult};
+pub use ops::{
+    list::{ListPage, ListPaginator, ListRequest, ObjectInfo},
+    upload::{FileUploadResult, UploadRequest, UploadResult},
+};
