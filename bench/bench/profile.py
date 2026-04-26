@@ -49,7 +49,7 @@ PROFILES: dict[str, Profile] = {
     ),
     "full": Profile(
         name="full",
-        backends=("minio", "rustfs", "seaweedfs", "garage"),
+        backends=("minio", "seaweedfs", "garage"),
         tools=("s3z", "mc", "s5cmd", "aws"),
         file_count=3,
         file_size_mb=256,

@@ -52,7 +52,7 @@ class DownloadOp:
             dest_dir=self.dest_dir,
         )
 
-    def csv_config(self, _params: DownloadCmd) -> dict[str, object]:
+    def csv_config(self, params: DownloadCmd) -> dict[str, object]:  # noqa: ARG002
         return {
             "files": self.file_count,
             "file_size_mb": self.file_size_mb,

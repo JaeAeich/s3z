@@ -8,6 +8,7 @@ S3_ENDPOINT_GARAGE = "http://localhost:9700"
 S3_ENDPOINT_MINIO = "http://localhost:9000"
 S3_ENDPOINT_RUSTFS = "http://localhost:9300"
 S3_ENDPOINT_SEAWEEDFS = "http://localhost:9500"
+_.python.venv = { create = true, path = "bench/.venv" }
 
 [tasks.bench]
 description = "Run full benchmark (all backends, all tools, ~10-15 min)"

@@ -14,7 +14,6 @@ COMPOSE_FILE = PROJECT_ROOT / "docker-compose.yaml"
 
 BACKENDS = [
     Backend("minio", "http://localhost:9000", "us-east-1"),
-    Backend("rustfs", "http://localhost:9300", "us-east-1"),
     Backend("seaweedfs", "http://localhost:9500", "us-east-1"),
     Backend("garage", "http://localhost:9700", "garage"),
 ]
