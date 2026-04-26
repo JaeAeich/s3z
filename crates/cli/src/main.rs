@@ -36,6 +36,7 @@ async fn main() -> anyhow::Result<()> {
     let client = S3Client::new(config).await?;
 
     match &cli.command {
+        Command::Download(args) => commands::download::run(&client, args, cli.quiet).await?,
         Command::Ls(args) => commands::list::run(&client, args, cli.quiet).await?,
         Command::Upload(args) => commands::upload::run(&client, args, cli.quiet).await?,
     }

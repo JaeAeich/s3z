@@ -37,10 +37,36 @@ pub(crate) struct Cli {
 /// Available commands.
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// Download objects from S3 to a local directory.
+    Download(DownloadArgs),
     /// List objects in an S3 bucket.
     Ls(ListArgs),
     /// Upload files or directories to S3.
     Upload(UploadArgs),
+}
+
+/// Arguments for the download subcommand.
+#[derive(Debug, clap::Args)]
+pub(crate) struct DownloadArgs {
+    /// Source S3 bucket.
+    #[arg(short, long)]
+    pub bucket: String,
+
+    /// Key prefix to download (e.g. `data/2024/`).
+    #[arg(short, long, default_value = "")]
+    pub prefix: String,
+
+    /// Local directory to write files into.
+    #[arg(short, long, default_value = ".")]
+    pub dest: PathBuf,
+
+    /// Number of files downloaded in parallel (auto-tuned if omitted).
+    #[arg(short, long)]
+    pub workers: Option<usize>,
+
+    /// Number of parts downloaded concurrently per file (auto-tuned if omitted).
+    #[arg(short, long)]
+    pub concurrency: Option<usize>,
 }
 
 /// Arguments for the ls subcommand.
