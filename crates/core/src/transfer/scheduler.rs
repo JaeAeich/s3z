@@ -12,6 +12,29 @@ const MIN_PART_SIZE: u64 = 8 * 1024 * 1024;
 /// Maximum part size (256 MiB — keep individual retries cheap).
 const MAX_PART_SIZE: u64 = 256 * 1024 * 1024;
 
+const GIB: u64 = 1024 * 1024 * 1024;
+
+/// Choose per-file concurrency based on file size.
+///
+/// Small files need fewer concurrent streams (less contention, lower RSS).
+/// Large files need more to saturate WAN bandwidth. The tiers are:
+///
+/// | File size | Concurrency | Rationale |
+/// |-----------|-------------|-----------|
+/// | ≤ 256 MiB | 2 | Minimal multipart — two streams enough |
+/// | 256 MiB – 2 GiB | 4 | Moderate parallelism |
+/// | > 2 GiB | 8 | Saturate high-bandwidth links |
+#[must_use]
+pub(crate) const fn concurrency_for_size(file_size: u64) -> usize {
+    if file_size <= 256 * 1024 * 1024 {
+        2
+    } else if file_size <= 2 * GIB {
+        4
+    } else {
+        8
+    }
+}
+
 /// Compute an optimal part size for uploads.
 ///
 /// Targets `concurrency * 2` parts so the upload pipeline has headroom:
@@ -252,5 +275,26 @@ mod tests {
     fn download_zero_concurrency_does_not_panic() {
         let ps = compute_download_part_size(256 * MB, 0);
         assert_eq!(ps, 256 * MB);
+    }
+
+    // --- concurrency_for_size tests ---
+
+    #[test]
+    fn concurrency_small_file() {
+        assert_eq!(concurrency_for_size(128 * MB), 2);
+        assert_eq!(concurrency_for_size(256 * MB), 2);
+    }
+
+    #[test]
+    fn concurrency_medium_file() {
+        assert_eq!(concurrency_for_size(256 * MB + 1), 4);
+        assert_eq!(concurrency_for_size(1024 * MB), 4);
+        assert_eq!(concurrency_for_size(2 * 1024 * MB), 4);
+    }
+
+    #[test]
+    fn concurrency_large_file() {
+        assert_eq!(concurrency_for_size(2 * 1024 * MB + 1), 8);
+        assert_eq!(concurrency_for_size(10 * 1024 * MB), 8);
     }
 }

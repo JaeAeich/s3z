@@ -94,6 +94,9 @@ impl UploadRequest {
     ///
     /// Each part is streamed from disk through a 256 KiB buffer, so peak
     /// memory per file is roughly `concurrency_per_file * 256 KiB`.
+    ///
+    /// Note: actual per-file concurrency is dynamically scaled by
+    /// [`scheduler::concurrency_for_size`] based on each file's size.
     #[inline]
     #[must_use]
     pub fn new(
@@ -284,9 +287,13 @@ async fn single_put(
 }
 
 /// Upload a single file — picks single PUT or multipart based on size.
+///
+/// Concurrency is dynamically scaled per file: small files use fewer
+/// concurrent streams (lower RSS/contention), large files use more
+/// to saturate bandwidth. See [`scheduler::concurrency_for_size`].
 async fn upload_single_file(
     http: &reqwest::Client, config: &Config, creds: &Credentials, bucket: &str, key: &ObjectKey,
-    path: &Path, concurrency: usize,
+    path: &Path, _concurrency: usize,
 ) -> Result<FileUploadResult> {
     let metadata = fs::metadata(path).await?;
     let size = metadata.len();
@@ -310,7 +317,8 @@ async fn upload_single_file(
             source: path.to_owned(),
         })
     } else {
-        maybe_debug!(key = %key, size, "multipart upload");
+        let concurrency = scheduler::concurrency_for_size(size);
+        maybe_debug!(key = %key, size, concurrency, "multipart upload");
         let part_size = scheduler::compute_part_size(size, concurrency);
         let transfer = TransferConfig {
             part_size,

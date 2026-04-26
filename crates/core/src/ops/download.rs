@@ -377,8 +377,8 @@ pub fn tune_parallelism(objects: &[ObjectInfo], multipart_threshold: u64) -> Par
         }
     } else {
         // Large-files mode: fewer workers, more parts per file.
-        // Target ~8 parts per file (matches DEFAULT_CONCURRENCY), but
-        // cap so workers * concurrency ≤ budget.
+        // Target matches DEFAULT_CONCURRENCY; cap so
+        // workers * concurrency ≤ budget.
         let target_concurrency = DEFAULT_CONCURRENCY;
         let workers = (TOTAL_REQUEST_BUDGET / target_concurrency).min(objects.len()).max(1);
         ParallelismConfig {
@@ -389,10 +389,15 @@ pub fn tune_parallelism(objects: &[ObjectInfo], multipart_threshold: u64) -> Par
 }
 
 /// Download a single object — picks single GET or multipart based on size.
+///
+/// Concurrency is dynamically scaled per file via
+/// [`scheduler::concurrency_for_size`]: small files that exceed the
+/// multipart threshold get fewer concurrent Range requests, large files
+/// get more to saturate bandwidth.
 #[expect(clippy::too_many_arguments, reason = "internal fn, context struct would add indirection")]
 async fn download_single_object(
     http: &reqwest::Client, config: &crate::config::Config, creds: &crate::auth::Credentials,
-    bucket: &str, prefix: &str, obj: &ObjectInfo, dest_dir: &Path, concurrency: usize,
+    bucket: &str, prefix: &str, obj: &ObjectInfo, dest_dir: &Path, _concurrency: usize,
 ) -> Result<FileDownloadResult> {
     let rel_key = obj.key.strip_prefix(prefix).unwrap_or(&obj.key);
     let dest = dest_dir.join(rel_key);
@@ -406,7 +411,8 @@ async fn download_single_object(
         let size = download::download_single(http, config, creds, bucket, &key, &dest).await?;
         (size, 1_u32)
     } else {
-        maybe_debug!(key = %key, size = obj.size, "multipart download");
+        let concurrency = scheduler::concurrency_for_size(obj.size);
+        maybe_debug!(key = %key, size = obj.size, concurrency, "multipart download");
         let part_size = scheduler::compute_download_part_size(obj.size, concurrency);
         let transfer = TransferConfig {
             part_size,
