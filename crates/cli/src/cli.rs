@@ -37,8 +37,22 @@ pub(crate) struct Cli {
 /// Available commands.
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// List objects in an S3 bucket.
+    Ls(ListArgs),
     /// Upload files or directories to S3.
     Upload(UploadArgs),
+}
+
+/// Arguments for the ls subcommand.
+#[derive(Debug, clap::Args)]
+pub(crate) struct ListArgs {
+    /// S3 bucket to list.
+    #[arg(short, long)]
+    pub bucket: String,
+
+    /// Key prefix to filter by (e.g. `data/2024/`).
+    #[arg(short, long, default_value = "")]
+    pub prefix: String,
 }
 
 /// Arguments for the upload subcommand.
