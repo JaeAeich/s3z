@@ -86,7 +86,7 @@ def plot_all(source: str = "saved") -> None:
     print(f"Plotting benchmark: {meta.commit_short} ({meta.date}) [profile={meta.profile}]")
 
     PLOTS_DIR.mkdir(exist_ok=True)
-    suffix = "" if source == "saved" else f"-{source}"
+    suffix = ""
 
     if (run_dir / "upload.csv").exists():
         _plot_upload(run_dir, meta, suffix)
