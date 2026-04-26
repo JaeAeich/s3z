@@ -5,7 +5,8 @@ use crate::{config::TransferConfig, transfer::part::Part};
 /// Maximum number of parts S3 allows per multipart upload.
 const MAX_S3_PARTS: u64 = 10_000;
 
-/// Minimum part size (5 MiB — S3 hard minimum, except for the last part).
+/// Minimum part size (8 MiB — above S3's 5 MiB hard minimum, rounded up
+/// for better alignment with typical network and disk I/O granularity).
 const MIN_PART_SIZE: u64 = 8 * 1024 * 1024;
 
 /// Maximum part size (256 MiB — keep individual retries cheap).

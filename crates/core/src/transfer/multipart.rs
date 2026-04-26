@@ -161,6 +161,8 @@ pub(crate) async fn upload_multipart(
     http: &reqwest::Client, config: &Config, creds: &Credentials, bucket: &str, key: &ObjectKey,
     parts: &[Part], file_path: &Path, concurrency: usize,
 ) -> Result<(String, u32)> {
+    assert!(concurrency > 0, "concurrency must be at least 1");
+
     #[cfg(feature = "tracing")]
     let start = std::time::Instant::now();
 

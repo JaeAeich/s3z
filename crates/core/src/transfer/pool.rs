@@ -22,6 +22,8 @@ where
     F: Fn(I) -> Fut + Send,
     Fut: Future<Output = Result<R>> + Send + 'static,
 {
+    assert!(workers > 0, "workers must be at least 1");
+
     let mut iter = items.into_iter();
     let (lower, _) = iter.size_hint();
     let mut results: Vec<R> = Vec::with_capacity(lower);
@@ -141,5 +143,19 @@ mod tests {
         assert_eq!(results.len(), 3);
         // With 1 worker, results should be in order
         assert_eq!(results, vec![10, 20, 30]);
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "workers must be at least 1")]
+    async fn pool_zero_workers_panics() {
+        drop(
+            run_pool(
+                vec![1, 2, 3],
+                0,
+                |i: u32| async move { Ok(i) },
+                None::<&(dyn Fn(&u32) + Send + Sync)>,
+            )
+            .await,
+        );
     }
 }
