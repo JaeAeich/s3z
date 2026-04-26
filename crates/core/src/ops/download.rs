@@ -172,7 +172,8 @@ impl S3Client {
         };
 
         // Auto-tune based on the first page sample.
-        let tuned = tune_parallelism(&first_objects, self.config.transfer.multipart_threshold);
+        let tuned =
+            tune_parallelism(&first_objects, self.config.transfer.multipart_download_threshold);
         let user_set_workers = req.workers != DEFAULT_WORKERS;
         let user_set_concurrency = req.concurrency_per_file != DEFAULT_CONCURRENCY;
 
@@ -400,13 +401,13 @@ async fn download_single_object(
     #[cfg(feature = "tracing")]
     let file_start = std::time::Instant::now();
 
-    let (size, parts) = if obj.size <= config.transfer.multipart_threshold {
+    let (size, parts) = if obj.size <= config.transfer.multipart_download_threshold {
         maybe_debug!(key = %key, size = obj.size, "single GET");
         let size = download::download_single(http, config, creds, bucket, &key, &dest).await?;
         (size, 1_u32)
     } else {
         maybe_debug!(key = %key, size = obj.size, "multipart download");
-        let part_size = scheduler::compute_part_size(obj.size, concurrency);
+        let part_size = scheduler::compute_download_part_size(obj.size, concurrency);
         let transfer = TransferConfig {
             part_size,
             ..config.transfer

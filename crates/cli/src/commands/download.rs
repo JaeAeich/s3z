@@ -29,7 +29,8 @@ pub(crate) async fn run(client: &S3Client, args: &DownloadArgs, quiet: bool) -> 
         let total_files = objects.len();
 
         // Auto-tune unless the user explicitly set workers/concurrency.
-        let tuned = tune_parallelism(&objects, client.config().transfer.multipart_threshold);
+        let tuned =
+            tune_parallelism(&objects, client.config().transfer.multipart_download_threshold);
         req.workers = args.workers.unwrap_or(tuned.workers);
         req.concurrency_per_file = args.concurrency.unwrap_or(tuned.concurrency_per_file);
 

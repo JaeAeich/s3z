@@ -2,24 +2,22 @@
 //!
 //! Small files are fetched with a single GET and streamed to disk.
 //! Large files are split into Range requests that write concurrently
-//! to different offsets of the same file. Peak memory per part is
-//! bounded by the streaming buffer size (256 KiB).
+//! to different offsets of the same file via positioned writes (`pwrite`).
+//! A single fd is shared across all part tasks — no per-part open/seek/close.
+//! Peak memory per part is bounded by the streaming buffer size (256 KiB).
 //!
 //! Temp files use [`tempfile::NamedTempFile`] for crash-safe cleanup:
 //! if the process is killed mid-download, the OS reclaims the temp
 //! file instead of leaving orphaned `.s3z.part` files on disk.
 
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{os::unix::fs::FileExt as _, path::Path, sync::Arc};
 
 use bytes::Bytes;
 use futures_util::StreamExt as _;
 use http::{Method, Uri};
 use tokio::{
     fs,
-    io::{AsyncSeekExt as _, AsyncWriteExt as _},
+    io::AsyncWriteExt as _,
     sync::mpsc,
     task::{self, JoinSet},
 };
@@ -96,13 +94,14 @@ struct DownloadCtx {
     bucket: String,
     config: Config,
     creds: Credentials,
+    /// Shared file descriptor — all part tasks write to this via `pwrite`.
+    fd: Arc<std::fs::File>,
     http: reqwest::Client,
     key: ObjectKey,
 }
 
 /// Part job metadata for the download scheduler.
 struct DownloadPartJob {
-    dest: Arc<PathBuf>,
     #[cfg_attr(not(feature = "tracing"), expect(dead_code, reason = "read by maybe_debug!"))]
     number: u32,
     offset: u64,
@@ -111,8 +110,12 @@ struct DownloadPartJob {
 
 /// Download a single object using concurrent Range requests.
 ///
-/// Each part writes to the correct offset in the destination file.
-/// The file is created at full size first, then parts fill it concurrently.
+/// All parts share a single file descriptor and write to their respective
+/// offsets via `pwrite` (positioned write). This avoids the overhead of
+/// opening/seeking/flushing a separate fd per part. The file is
+/// pre-allocated to its full size, then a single `sync_all` is issued
+/// after all parts have completed.
+///
 /// Uses [`tempfile::NamedTempFile`] for crash-safe cleanup.
 ///
 /// # Errors
@@ -136,15 +139,11 @@ pub(crate) async fn download_multipart(
     .await
     .map_err(|e| Error::Internal(e.to_string()))??;
 
-    // Workers need the path to open independent fds for concurrent writes.
-    let tmp_path = tmp.path().to_owned();
-
-    // Pre-allocate via reopen() so we use the same underlying file, not
-    // a fresh create that would disconnect from the NamedTempFile guard.
+    // Open a single shared fd via reopen(). Pre-allocate to full size so
+    // the filesystem can allocate contiguously.
     let std_file = tmp.reopen()?;
-    let file = fs::File::from_std(std_file);
-    file.set_len(total_size).await?;
-    drop(file);
+    std_file.set_len(total_size)?;
+    let shared_fd = Arc::new(std_file);
 
     maybe_info!(
         key = %key, parts = parts.len(), concurrency, size = total_size,
@@ -155,14 +154,21 @@ pub(crate) async fn download_multipart(
         bucket: bucket.to_owned(),
         config: config.clone(),
         creds: creds.clone(),
+        fd: shared_fd,
         http: http.clone(),
         key: key.clone(),
     });
 
-    let result = download_all_parts(&ctx, parts, &tmp_path, concurrency).await;
+    let result = download_all_parts(&ctx, parts, concurrency).await;
 
     match result {
         Ok(()) => {
+            // Single sync after all parts are written.
+            let fd = Arc::clone(&ctx.fd);
+            task::spawn_blocking(move || fd.sync_all())
+                .await
+                .map_err(|e| Error::Internal(e.to_string()))??;
+
             let dest = dest.to_owned();
             task::spawn_blocking(move || tmp.persist(dest).map_err(|e| Error::Io(e.error)))
                 .await
@@ -180,18 +186,15 @@ pub(crate) async fn download_multipart(
 
 /// Schedule and download all parts using a producer-consumer pipeline.
 async fn download_all_parts(
-    ctx: &Arc<DownloadCtx>, parts: &[Part], dest: &Path, concurrency: usize,
+    ctx: &Arc<DownloadCtx>, parts: &[Part], concurrency: usize,
 ) -> Result<()> {
     let (tx, rx) = mpsc::channel::<DownloadPartJob>(concurrency);
 
-    let shared_dest = Arc::new(dest.to_owned());
     let parts_owned: Vec<Part> = parts.to_vec();
-    let dest_for_scheduler = Arc::clone(&shared_dest);
 
     let scheduler_handle = task::spawn(async move {
         for part in &parts_owned {
             let job = DownloadPartJob {
-                dest: Arc::clone(&dest_for_scheduler),
                 number: part.number,
                 offset: part.offset,
                 size: part.size,
@@ -250,12 +253,10 @@ async fn run_download_workers(
 
 /// Download a single Range part and write it to the correct file offset.
 ///
-/// # Safety invariant (not `unsafe`, but correctness-critical)
-///
-/// Each task opens its own file descriptor via `File::options().open()`.
-/// On Unix this creates an independent kernel file-description with its own
-/// offset, so concurrent seek+write from different tasks cannot interfere.
-/// Do **not** refactor this to share a single `File` handle across tasks.
+/// Uses `write_all_at` (pwrite) on the shared fd — a positioned write that
+/// does not modify the fd's internal offset. This is safe for concurrent
+/// use from multiple tasks because each task writes to a non-overlapping
+/// byte range and pwrite is atomic with respect to offset.
 async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
     debug_assert!(job.size > 0, "zero-size part would underflow range calculation");
     #[expect(
@@ -280,15 +281,23 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
 
     let resp = send_with_retry(&ctx.http, signed, &ctx.config.retry).await?;
 
-    let mut file = fs::File::options().write(true).open(&*job.dest).await?;
-    file.seek(std::io::SeekFrom::Start(job.offset)).await?;
-
+    let fd = Arc::clone(&ctx.fd);
+    let mut write_offset = job.offset;
     let mut stream = resp.bytes_stream();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
-        file.write_all(&chunk).await?;
+        let len = chunk.len();
+        let offset = write_offset;
+        let fd_ref = Arc::clone(&fd);
+        // pwrite via spawn_blocking — positioned write, no seek needed.
+        task::spawn_blocking(move || fd_ref.write_all_at(&chunk, offset))
+            .await
+            .map_err(|e| Error::Internal(e.to_string()))??;
+        #[expect(clippy::arithmetic_side_effects, reason = "write_offset bounded by file size")]
+        {
+            write_offset += u64::try_from(len).unwrap_or(u64::MAX);
+        }
     }
-    file.flush().await?;
 
     Ok(())
 }

@@ -39,6 +39,10 @@ pub struct RetryPolicy {
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct TransferConfig {
+    /// Files larger than this (bytes) use multipart download (Range
+    /// requests). Downloads below this threshold use a single GET, which
+    /// avoids per-Range HTTP overhead. Defaults to 256 MiB.
+    pub multipart_download_threshold: u64,
     /// Files larger than this (bytes) use multipart upload.
     pub multipart_threshold: u64,
     /// Default part size hint (bytes). For multipart uploads, the actual
@@ -115,6 +119,7 @@ impl Default for TransferConfig {
     #[inline]
     fn default() -> Self {
         Self {
+            multipart_download_threshold: 2 * 1024 * 1024 * 1024,
             multipart_threshold: 50 * 1024 * 1024,
             part_size: 50 * 1024 * 1024,
         }
@@ -157,6 +162,7 @@ mod tests {
     fn transfer_config_defaults() {
         let tc = TransferConfig::default();
         assert_eq!(tc.multipart_threshold, 50 * 1024 * 1024);
+        assert_eq!(tc.multipart_download_threshold, 2 * 1024 * 1024 * 1024);
         assert_eq!(tc.part_size, 50 * 1024 * 1024);
     }
 
