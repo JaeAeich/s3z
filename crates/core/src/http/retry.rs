@@ -336,9 +336,10 @@ mod tests {
     #[tokio::test]
     async fn retry_exhaustion_returns_last_error() {
         let server = MockServer::start().await;
+        // 1 initial attempt + 2 retries = 3 total
         Mock::given(method("GET"))
             .respond_with(ResponseTemplate::new(503).set_body_string("unavailable"))
-            .expect(3) // 1 initial + 2 retries
+            .expect(3)
             .mount(&server)
             .await;
 

@@ -2,11 +2,13 @@
 aws-credential-types = { workspace = true }
 aws-sigv4 = { workspace = true }
 bytes = { workspace = true }
+futures-util = { workspace = true }
 http = { workspace = true }
 percent-encoding = { workspace = true }
 quick-xml = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

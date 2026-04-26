@@ -52,6 +52,13 @@ pub use client::S3Client;
 pub use config::Config;
 pub use http::ObjectKey;
 pub use ops::{
+    download::{
+        DownloadRequest,
+        DownloadResult,
+        FileDownloadResult,
+        ParallelismConfig,
+        tune_parallelism,
+    },
     list::{ListPage, ListPaginator, ListRequest, ObjectInfo},
     upload::{FileUploadResult, UploadRequest, UploadResult},
 };

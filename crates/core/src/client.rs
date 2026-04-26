@@ -19,6 +19,13 @@ pub struct S3Client {
 }
 
 impl S3Client {
+    /// Access the client configuration.
+    #[inline]
+    #[must_use]
+    pub const fn config(&self) -> &Config {
+        &self.config
+    }
+
     /// Create a new client with the given configuration.
     ///
     /// The connection pool grows on demand — no eager warmup. The first
