@@ -4,7 +4,12 @@
 //! Large files are split into Range requests that write concurrently
 //! to different offsets of the same file via positioned writes (`pwrite`).
 //! A single fd is shared across all part tasks — no per-part open/seek/close.
-//! Peak memory per part is bounded by the streaming buffer size (256 KiB).
+//!
+//! Disk I/O for multipart downloads runs on a **dedicated writer thread**
+//! (not tokio's blocking pool). Async download tasks send buffered chunks
+//! over a bounded channel; the writer thread drains them with `pwrite`.
+//! This eliminates ~10K `spawn_blocking` dispatches per GB and the
+//! associated thread-pool scheduling overhead.
 //!
 //! Temp files use [`tempfile::NamedTempFile`] for crash-safe cleanup:
 //! if the process is killed mid-download, the OS reclaims the temp
@@ -89,15 +94,63 @@ pub(crate) async fn download_single(
     Ok(size)
 }
 
+/// A write command sent from async download tasks to the writer thread.
+struct WriteCmd {
+    buf: Vec<u8>,
+    offset: u64,
+}
+
+/// Handle to the dedicated writer thread. Async tasks send [`WriteCmd`]s
+/// through the bounded channel; the thread does `pwrite` without touching
+/// the tokio runtime. Dropped senders signal the thread to flush and exit.
+struct DiskWriter {
+    tx: std::sync::mpsc::SyncSender<WriteCmd>,
+    handle: Option<std::thread::JoinHandle<std::io::Result<()>>>,
+}
+
+impl DiskWriter {
+    /// Spawn a writer thread for `fd`. `capacity` bounds the channel
+    /// (backpressure: async tasks block when the writer can't keep up).
+    fn spawn(fd: Arc<std::fs::File>, capacity: usize) -> Self {
+        let (tx, rx) = std::sync::mpsc::sync_channel::<WriteCmd>(capacity);
+        let handle = std::thread::spawn(move || {
+            while let Ok(cmd) = rx.recv() {
+                fd.write_all_at(&cmd.buf, cmd.offset)?;
+            }
+            fd.sync_all()
+        });
+        Self {
+            tx,
+            handle: Some(handle),
+        }
+    }
+
+    /// Wait for the writer thread to finish and propagate any I/O error.
+    ///
+    /// All other sender clones (in `DownloadCtx`) must be dropped before
+    /// calling this so the writer's `recv()` loop can exit.
+    fn finish(self) -> Result<()> {
+        // Drop our sender — if all other clones are already dropped,
+        // this unblocks the writer thread's recv() loop.
+        drop(self.tx);
+        if let Some(h) = self.handle {
+            h.join()
+                .map_err(|_| Error::Internal("writer thread panicked".into()))?
+                .map_err(Error::Io)?;
+        }
+        Ok(())
+    }
+}
+
 /// Context for a multipart download.
 struct DownloadCtx {
     bucket: String,
     config: Config,
     creds: Credentials,
-    /// Shared file descriptor — all part tasks write to this via `pwrite`.
-    fd: Arc<std::fs::File>,
     http: reqwest::Client,
     key: ObjectKey,
+    /// Channel to the dedicated writer thread.
+    writer_tx: std::sync::mpsc::SyncSender<WriteCmd>,
 }
 
 /// Part job metadata for the download scheduler.
@@ -143,7 +196,10 @@ pub(crate) async fn download_multipart(
     // the filesystem can allocate contiguously.
     let std_file = tmp.reopen()?;
     std_file.set_len(total_size)?;
-    let shared_fd = Arc::new(std_file);
+
+    // Spawn a dedicated writer thread. Channel capacity = concurrency × 2
+    // so each async part task can have one buffer in-flight plus one queued.
+    let writer = DiskWriter::spawn(Arc::new(std_file), concurrency.saturating_mul(2).max(2));
 
     maybe_info!(
         key = %key, parts = parts.len(), concurrency, size = total_size,
@@ -154,20 +210,20 @@ pub(crate) async fn download_multipart(
         bucket: bucket.to_owned(),
         config: config.clone(),
         creds: creds.clone(),
-        fd: shared_fd,
         http: http.clone(),
         key: key.clone(),
+        writer_tx: writer.tx.clone(),
     });
 
     let result = download_all_parts(&ctx, parts, concurrency).await;
 
+    // Drop all sender clones so the writer thread can exit.
+    drop(ctx);
+
     match result {
         Ok(()) => {
-            // Single sync after all parts are written.
-            let fd = Arc::clone(&ctx.fd);
-            task::spawn_blocking(move || fd.sync_all())
-                .await
-                .map_err(|e| Error::Internal(e.to_string()))??;
+            // Wait for writer to flush + sync_all.
+            writer.finish()?;
 
             let dest = dest.to_owned();
             task::spawn_blocking(move || tmp.persist(dest).map_err(|e| Error::Io(e.error)))
@@ -252,17 +308,17 @@ async fn run_download_workers(
 }
 
 /// Write buffer capacity — network chunks (~16 KiB from reqwest) are
-/// accumulated here and flushed in a single `pwrite` once full.
-/// 512 KiB keeps `spawn_blocking` calls at ~2K/GB (vs 64K/GB unbuffered)
-/// while bounding per-part memory (8 concurrent parts × 512 KiB = 4 MiB).
+/// accumulated here and sent to the writer thread once full.
+/// 512 KiB balances syscall amortisation against per-part memory
+/// (8 concurrent parts × 512 KiB = 4 MiB channel payload).
 const WRITE_BUF_SIZE: usize = 512 * 1024;
 
 /// Download a single Range part and write it to the correct file offset.
 ///
-/// Buffers incoming network chunks (typically ~16 KiB each) into a
-/// [`WRITE_BUF_SIZE`] buffer and issues a single `pwrite` per buffer-full.
-/// This amortises the `spawn_blocking` + syscall overhead: a 256 MiB part
-/// produces ~1 K pwrite calls instead of ~16 K.
+/// Buffers incoming network chunks into a [`WRITE_BUF_SIZE`] buffer and
+/// sends each full buffer to the dedicated writer thread via the channel
+/// in [`DownloadCtx::writer_tx`]. No `spawn_blocking` — the async task
+/// stays on the tokio runtime for network I/O only.
 async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
     debug_assert!(job.size > 0, "zero-size part would underflow range calculation");
     #[expect(
@@ -287,7 +343,7 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
 
     let resp = send_with_retry(&ctx.http, signed, &ctx.config.retry).await?;
 
-    let fd = Arc::clone(&ctx.fd);
+    let tx = ctx.writer_tx.clone();
     let mut write_offset = job.offset;
     let mut buf = Vec::with_capacity(WRITE_BUF_SIZE);
     let mut stream = resp.bytes_stream();
@@ -299,11 +355,11 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
         if buf.len() >= WRITE_BUF_SIZE {
             let data = std::mem::replace(&mut buf, Vec::with_capacity(WRITE_BUF_SIZE));
             let data_len = data.len();
-            let offset = write_offset;
-            let fd_ref = Arc::clone(&fd);
-            task::spawn_blocking(move || fd_ref.write_all_at(&data, offset))
-                .await
-                .map_err(|e| Error::Internal(e.to_string()))??;
+            tx.send(WriteCmd {
+                buf: data,
+                offset: write_offset,
+            })
+            .map_err(|_| Error::Internal("writer thread exited early".into()))?;
             #[expect(clippy::arithmetic_side_effects, reason = "write_offset bounded by file size")]
             {
                 write_offset += u64::try_from(data_len).unwrap_or(u64::MAX);
@@ -313,11 +369,11 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
 
     // Flush remaining bytes.
     if !buf.is_empty() {
-        let offset = write_offset;
-        let fd_ref = Arc::clone(&fd);
-        task::spawn_blocking(move || fd_ref.write_all_at(&buf, offset))
-            .await
-            .map_err(|e| Error::Internal(e.to_string()))??;
+        tx.send(WriteCmd {
+            buf,
+            offset: write_offset,
+        })
+        .map_err(|_| Error::Internal("writer thread exited early".into()))?;
     }
 
     Ok(())
