@@ -1,0 +1,171 @@
+# Based on the maturin CI template, generated with:
+#   maturin generate-ci github -m bindings/python/Cargo.toml --platform manylinux macos
+#
+# Customised for s3z: version computation, pre-release publishing,
+# branch triggers, and target trimming (no Windows — core uses Unix APIs).
+
+name: Release Python
+
+on:
+  push:
+    tags:
+      - "**[0-9]+.[0-9]+.[0-9]+*"
+    branches:
+      - "release/**"
+      - "python/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-python-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MANIFEST_PATH: bindings/python/Cargo.toml
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            V="${GITHUB_REF#refs/tags/}"
+            V="${V#v}"
+            echo "version=$V" >> "$GITHUB_OUTPUT"
+            echo "is-prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            CARGO_VERSION=$(grep -m1 '^version' bindings/python/Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+            echo "version=${CARGO_VERSION}.dev${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+            echo "is-prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  linux:
+    needs: [version]
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-22.04
+            target: x86_64
+            manylinux: auto
+          - runner: ubuntu-22.04
+            target: aarch64
+            manylinux: "2_28"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Patch version for pre-release
+        if: ${{ needs.version.outputs.is-prerelease == 'true' }}
+        run: |
+          sed -i 's/^version = .*/version = "${{ needs.version.outputs.version }}"/' bindings/python/pyproject.toml
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --find-interpreter --manifest-path ${{ env.MANIFEST_PATH }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          manylinux: ${{ matrix.platform.manylinux }}
+      - name: Upload wheels
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-linux-${{ matrix.platform.target }}
+          path: dist
+
+  macos:
+    needs: [version]
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: macos-15-intel
+            target: x86_64
+          - runner: macos-latest
+            target: aarch64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Patch version for pre-release
+        if: ${{ needs.version.outputs.is-prerelease == 'true' }}
+        run: |
+          sed -i.bak 's/^version = .*/version = "${{ needs.version.outputs.version }}"/' bindings/python/pyproject.toml
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --find-interpreter --manifest-path ${{ env.MANIFEST_PATH }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload wheels
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-macos-${{ matrix.platform.target }}
+          path: dist
+
+  sdist:
+    needs: [version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Patch version for pre-release
+        if: ${{ needs.version.outputs.is-prerelease == 'true' }}
+        run: |
+          sed -i 's/^version = .*/version = "${{ needs.version.outputs.version }}"/' bindings/python/pyproject.toml
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist --manifest-path ${{ env.MANIFEST_PATH }}
+      - name: Upload sdist
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-sdist
+          path: dist
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    needs: [version, linux, macos, sdist]
+    environment: release
+    permissions:
+      id-token: write
+      contents: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: "dist/*"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      # Version tags → publish as stable.
+      - name: Publish to PyPI
+        if: ${{ needs.version.outputs.is-prerelease == 'false' }}
+        run: uv publish dist/*
+
+      # Branch pushes → publish as pre-release.
+      - name: Publish to PyPI (dev)
+        if: ${{ needs.version.outputs.is-prerelease == 'true' }}
+        run: uv publish dist/*
