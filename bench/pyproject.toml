@@ -10,7 +10,7 @@ dependencies = ["matplotlib>=3.9"]
 description = "Benchmark framework for s3z"
 name = "s3z-bench"
 requires-python = ">=3.10"
-version = "0.1.0-rc.1"
+version = "0.1.0-rc.2"
 
 [project.scripts]
 s3z-bench = "bench.cli:main"

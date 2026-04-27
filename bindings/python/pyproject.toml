@@ -6,7 +6,7 @@ requires = ["maturin>=1.8"]
 name = "s3z"
 readme = "README.md"
 requires-python = ">=3.11"
-version = "0.1.0-rc.1"
+version = "0.1.0-rc.2"
 
 [tool.maturin]
 module-name = "s3z"

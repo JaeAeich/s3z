@@ -15,7 +15,7 @@ dependencies = [
 description = "FastAPI server using s3z Python bindings"
 name = "s3z-fastapi-example"
 requires-python = ">=3.11"
-version = "0.1.0-rc.1"
+version = "0.1.0-rc.2"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/server"]

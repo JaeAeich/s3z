@@ -1,6 +1,6 @@
 {
   "name": "@jae_aeich/s3z",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "description": "Node.js bindings for s3z — S3 ops, but fearlessly fast!",
   "main": "index.js",
   "types": "index.d.ts",

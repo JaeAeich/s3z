@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-rc.2] — 2026-04-27
+
+### Bug Fixes
+
+- **core:** Remove redundant num_parts and fix private doc links ([e18aaba](https://github.com/jaeaeich/s3z/commit/e18aaba4a33f183149e88f6c39e4e6edbd2a63c3))
+
+### CI/CD
+
+- Add Rust crate release workflow ([9826ec2](https://github.com/jaeaeich/s3z/commit/9826ec2cd679b38a99083ac1eab6b6104fd2375d))
+- Add PR and push-to-main CI workflow ([215bd72](https://github.com/jaeaeich/s3z/commit/215bd7217ecb93dbe87850a2e217bb6419241703))
+- **deps:** Bump actions/attest-build-provenance from 3 to 4 ([baa4782](https://github.com/jaeaeich/s3z/commit/baa47829c4e22a9f48538630f1f48ee96037114d))
+- **deps:** Bump actions/setup-node from 4 to 6 (#8) ([63a975c](https://github.com/jaeaeich/s3z/commit/63a975cedad6ca60b789846407882f12c21c5f32))
+- **deps:** Bump actions/cache from 4 to 5 (#7) ([ae81a29](https://github.com/jaeaeich/s3z/commit/ae81a29484e102af814a501635dcabc2d54cfd57))
+
+### Documentation
+
+- **bindings:** Add package READMEs for PyPI and npm ([032ceba](https://github.com/jaeaeich/s3z/commit/032cebaf3bde36b2f0ee359112208c3f971df029))
+- **bindings:** Add install options and fix endpoint labels ([dd9886c](https://github.com/jaeaeich/s3z/commit/dd9886cb103f04c010d2c428e320f096422c9a79))
+- **core:** Add crate-specific README for crates.io ([ba23b83](https://github.com/jaeaeich/s3z/commit/ba23b83d0cfb6cdbd6549b4bde7498e09cfc6c2a))
+- Add fumadocs documentation site ([2b54199](https://github.com/jaeaeich/s3z/commit/2b541999c98008067ad6e771899c6d199f492780))
+- Link example servers from quick-start pages ([0375ace](https://github.com/jaeaeich/s3z/commit/0375ace50536d38acfff7f464a849edbdccb2610))
+
+### Features
+
+- **bench:** Add dark theme variant for benchmark charts ([cf3d24c](https://github.com/jaeaeich/s3z/commit/cf3d24ca32b44acdc5b2b780a31f120b0b2616a1))
+
+### Miscellaneous
+
+- Track node binding type declarations for docs ([c85af29](https://github.com/jaeaeich/s3z/commit/c85af2914eeb8196255c4365ae19ae58f18d6028))
+- Update lockfiles ([7d3d066](https://github.com/jaeaeich/s3z/commit/7d3d066e65fa33c7cbd89994cbf7fac21b836e3a))
+- Add ruff hooks and scope editorconfig glob in lefthook ([3bd1e64](https://github.com/jaeaeich/s3z/commit/3bd1e64d5c30f8db5ffcbf54415aa1f23c8f3870))
+- Bump rust to 1.95.0 and pin in CI ([27b23e0](https://github.com/jaeaeich/s3z/commit/27b23e04992ec4798fc479532645255dd7930b57))
+
+### Style
+
+- **bench:** Apply ruff formatting to plot.py ([51985c7](https://github.com/jaeaeich/s3z/commit/51985c7332ffafc4109006af326043b195dffb72))
 ## [0.1.0-rc.1] — 2026-04-27
 
 ### Bug Fixes
@@ -65,6 +101,7 @@ All notable changes to this project will be documented in this file.
 - Add docker-compose services, mise stubs task, and gitignore ([a695549](https://github.com/jaeaeich/s3z/commit/a695549347047e70278bfb760cc1cc6f30d0079b))
 - Drop Windows from CLI release targets ([6b1faa0](https://github.com/jaeaeich/s3z/commit/6b1faa0b9d325ad820721f159000a2f2e89ce714))
 - Add git-cliff changelog configuration ([3d896fe](https://github.com/jaeaeich/s3z/commit/3d896feb2ceb16e6e94b0419570aef80b7bb429e))
+- **release:** V0.1.0-rc.1 ([eb30cfc](https://github.com/jaeaeich/s3z/commit/eb30cfc92d274af0d5d0cbaf14f94e8ab59cd9b4))
 
 ### Performance
 
