@@ -3,6 +3,10 @@ x-credentials: &credentials
   ACCESS_KEY: &access-key "GK000000000000000000000000"
   SECRET_KEY: &secret-key "0000000000000000000000000000000000000000000000000000000000000000"
 
+x-defaults: &defaults
+  REGION: &region "us-east-1"
+  BUCKET: &bucket "bench-bucket"
+
 # Resource limits for reproducible benchmarks. Each backend gets 2 CPUs / 1 GB
 # except SeaweedFS which needs 4 GB (all-in-one mode: master + volume + filer +
 # S3 in one process). Host needs >= 12 GB RAM and 4+ cores.
@@ -15,6 +19,18 @@ x-bench-resources: &bench-resources
       reservations:
         cpus: "1"
         memory: 512M
+
+x-server-healthcheck: &server-healthcheck
+  interval: 3s
+  timeout: 5s
+  retries: 10
+
+x-server-env: &server-env
+  AWS_ACCESS_KEY_ID: *access-key
+  AWS_SECRET_ACCESS_KEY: *secret-key
+  AWS_REGION: *region
+  S3_ENDPOINT: http://garage:3900
+  S3_BUCKET: *bucket
 
 services:
   # --- MinIO (S3 port: 9000) ---
@@ -55,43 +71,6 @@ services:
       ACCESS_KEY: *access-key
       SECRET_KEY: *secret-key
 
-  # --- RustFS (S3 port: 9300) ---
-  rustfs:
-    image: rustfs/rustfs:1.0.0-alpha.98
-    profiles:
-      - rustfs
-      - all
-    <<: *bench-resources
-    command: server /data --console-address ":9301"
-    ports:
-      - "9300:9000"
-    environment:
-      RUSTFS_ROOT_USER: *access-key
-      RUSTFS_ROOT_PASSWORD: *secret-key
-    healthcheck:
-      test: ["CMD-SHELL", "curl -so /dev/null -w '%{http_code}' http://localhost:9000/ | grep -qE '^[234]'"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-
-  rustfs-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
-    profiles:
-      - rustfs
-      - all
-    restart: "no"
-    depends_on:
-      rustfs:
-        condition: service_healthy
-    entrypoint: >
-      sh -c "
-      mc alias set local http://rustfs:9000 $${ACCESS_KEY} $${SECRET_KEY} &&
-      mc mb --ignore-existing local/bench-bucket
-      "
-    environment:
-      ACCESS_KEY: *access-key
-      SECRET_KEY: *secret-key
-
   # --- SeaweedFS (S3 port: 9500) ---
   # Needs 4 GB — runs master + volume + filer + S3 gateway in one process.
   seaweedfs:
@@ -113,7 +92,11 @@ services:
     volumes:
       - ./config/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -so /dev/null -w '%{http_code}' http://localhost:8333/ | grep -q '[234]'"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -so /dev/null -w '%{http_code}' http://localhost:8333/ | grep -q '[234]'",
+        ]
       interval: 3s
       timeout: 5s
       retries: 15
@@ -137,6 +120,10 @@ services:
     image: dxflrs/garage:v2.3.0
     profiles:
       - garage
+      - python
+      - typescript
+      - rust
+      - servers
       - all
     <<: *bench-resources
     command: /garage server --single-node --default-bucket
@@ -147,9 +134,66 @@ services:
     environment:
       GARAGE_DEFAULT_ACCESS_KEY: *access-key
       GARAGE_DEFAULT_SECRET_KEY: *secret-key
-      GARAGE_DEFAULT_BUCKET: bench-bucket
+      GARAGE_DEFAULT_BUCKET: *bucket
     healthcheck:
       test: ["CMD", "/garage", "status"]
       interval: 2s
       timeout: 5s
       retries: 10
+
+  # --- s3z FastAPI example (port: 8000) ---
+  s3z-python:
+    build:
+      context: .
+      dockerfile: examples/python/Dockerfile
+    profiles:
+      - python
+      - servers
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *server-env
+    healthcheck:
+      <<: *server-healthcheck
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/docs"]
+    depends_on:
+      garage:
+        condition: service_healthy
+
+  # --- s3z Elysia example (port: 3000) ---
+  s3z-typescript:
+    build:
+      context: .
+      dockerfile: examples/typescript/Dockerfile
+    profiles:
+      - typescript
+      - servers
+    ports:
+      - "3000:3000"
+    environment:
+      <<: *server-env
+    healthcheck:
+      <<: *server-healthcheck
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/docs"]
+    depends_on:
+      garage:
+        condition: service_healthy
+
+  # --- s3z Axum example (port: 8080) ---
+  s3z-rust:
+    build:
+      context: .
+      dockerfile: examples/rust/Dockerfile
+    profiles:
+      - rust
+      - servers
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *server-env
+    healthcheck:
+      <<: *server-healthcheck
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/docs"]
+    depends_on:
+      garage:
+        condition: service_healthy
