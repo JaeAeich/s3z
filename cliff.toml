@@ -1,0 +1,49 @@
+[changelog]
+body = """
+{%- macro remote_url() -%}
+  https://github.com/jaeaeich/s3z
+{%- endmacro -%}
+
+{% if version -%}
+  ## [{{ version | trim_start_matches(pat="v") }}] — {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+  ## [Unreleased]
+{% endif -%}
+
+{% for group, commits in commits | group_by(attribute="group") %}
+  ### {{ group | striptags | trim | upper_first }}
+  {% for commit in commits %}
+    - {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }} \
+      ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }}))\
+      {%- if commit.breaking %} **BREAKING**{% endif %}
+  {%- endfor %}
+{% endfor %}
+"""
+footer = ""
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.\n
+"""
+trim = true
+
+[git]
+commit_parsers = [
+  { group = "Bug Fixes", message = "^fix" },
+  { group = "Build", message = "^build" },
+  { group = "CI/CD", message = "^ci" },
+  { group = "Documentation", message = "^doc" },
+  { group = "Features", message = "^feat" },
+  { group = "Miscellaneous", message = "^chore" },
+  { group = "Performance", message = "^perf" },
+  { group = "Refactoring", message = "^refactor" },
+  { group = "Testing", message = "^test" },
+  { message = "^chore\\(release\\)", skip = true },
+]
+conventional_commits = true
+filter_commits = false
+filter_unconventional = true
+protect_breaking_commits = false
+sort_commits = "oldest"
+split_commits = false
+tag_pattern = "v[0-9].*"
