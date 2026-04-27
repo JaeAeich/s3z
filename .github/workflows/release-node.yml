@@ -153,7 +153,7 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: bindings-*
           path: ${{ env.WORKING_DIR }}/artifacts
