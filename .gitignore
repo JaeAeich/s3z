@@ -15,7 +15,11 @@ node_modules/
 bindings/python/s3z.pyi
 bindings/node/s3z.node
 bindings/node/index.js
-bindings/node/index.d.ts
 
 # Rust example (standalone, has its own target)
 examples/rust/target/
+
+# Docs (Next.js / fumadocs)
+docs/.next/
+docs/.source/
+docs/node_modules/
