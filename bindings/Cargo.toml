@@ -1,0 +1,30 @@
+[workspace]
+members = ["node", "python"]
+resolver = "2"
+
+[workspace.dependencies]
+napi = { features = ["async", "napi9"], version = "3" }
+napi-build = "2"
+napi-derive = "3"
+pyo3 = { features = [
+  "experimental-inspect",
+  "extension-module",
+], version = "0.28" }
+tokio = { features = [
+  "fs",
+  "macros",
+  "rt-multi-thread",
+  "sync",
+], version = "1" }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+
+[workspace.package]
+categories = ["asynchronous", "network-programming", "web-programming"]
+edition = "2024"
+keywords = ["aws", "cloud", "multithread", "s3", "storage"]
+license = "MIT"
+repository = "https://github.com/jaeaeich/s3z"

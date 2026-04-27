@@ -22,11 +22,12 @@ RUN pip install --no-cache-dir maturin
 WORKDIR /src
 COPY Cargo.toml Cargo.lock README.md ./
 COPY crates crates
+COPY bindings bindings
 
 RUN --mount=type=cache,target=/src/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     maturin build --release \
-        --manifest-path crates/python/Cargo.toml \
+        --manifest-path bindings/python/Cargo.toml \
         --out /wheels
 
 ###################################################

@@ -55,13 +55,9 @@ description = "Run a sweep — pass 'size' or 'concurrency' (e.g. mise run bench
 dir = "bench"
 run = "uv run s3z-bench sweep {{arg(name='args', var=true, default='')}}"
 
-[tasks."stubs:python"]
-description = "Regenerate s3z.pyi stubs from compiled module"
-dir = "crates/python"
-run = "maturin generate-stubs --out ."
-
 [tools]
 awscli = "2.34.32"
+git-cliff = "latest"
 lefthook = "2.1.1"
 mc = "RELEASE.2025-08-13T08-35-41Z"
 "npm:@commitlint/cli" = "20.4.1"

@@ -12,10 +12,10 @@ __pycache__/
 node_modules/
 
 # FFI build artifacts
-crates/python/s3z.pyi
-crates/node/s3z.node
-crates/node/index.js
-crates/node/index.d.ts
+bindings/python/s3z.pyi
+bindings/node/s3z.node
+bindings/node/index.js
+bindings/node/index.d.ts
 
 # Rust example (standalone, has its own target)
 examples/rust/target/

@@ -27,5 +27,5 @@ Please include:
 ## Scope
 
 This policy covers the s3z library (`crates/core`), CLI (`crates/cli`), and
-language bindings (`crates/node`, `crates/python`). Benchmark tooling and
+language bindings (`bindings/node`, `bindings/python`). Benchmark tooling and
 example applications are out of scope.

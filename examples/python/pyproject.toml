@@ -34,5 +34,5 @@ ignore = [
 select = ["ALL"]
 
 [tool.ty.environment]
-extra-paths = ["../../crates/python"]
+extra-paths = ["../../bindings/python"]
 python-version = "3.14"

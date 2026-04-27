@@ -12,7 +12,7 @@ docker compose --profile garage up -d
 bun install
 
 # Build the native module
-cd ../../crates/node && napi build --release && cd -
+cd ../../bindings/node && napi build --release && cd -
 
 # Run
 bun run dev

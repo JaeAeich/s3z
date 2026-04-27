@@ -8,7 +8,7 @@ python.uv_venv_auto = true
 
 [tasks.build]
 description = "Build s3z-python wheel and install into venv"
-run = "maturin develop --release --manifest-path ../../crates/python/Cargo.toml"
+run = "maturin develop --release --manifest-path ../../bindings/python/Cargo.toml"
 
 [tasks.dev]
 depends = ["install"]

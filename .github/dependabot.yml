@@ -19,7 +19,7 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "npm"
-    directory: "/crates/node"
+    directory: "/bindings/node"
     schedule:
       interval: "weekly"
     commit-message:
@@ -28,7 +28,7 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "pip"
-    directory: "/crates/python"
+    directory: "/bindings/python"
     schedule:
       interval: "weekly"
     commit-message:

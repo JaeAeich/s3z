@@ -1,5 +1,14 @@
+# The profile that 'dist' will build with
+
+[profile.dist]
+codegen-units = 1
+inherits = "release"
+lto = "fat"
+opt-level = "z"
+strip = "symbols"
+
 [workspace]
-exclude = ["examples/rust"]
+exclude = ["bindings", "examples/rust"]
 members = ["crates/*"]
 resolver = "2"
 
@@ -83,4 +92,4 @@ categories = ["asynchronous", "network-programming", "web-programming"]
 edition = "2024"
 keywords = ["aws", "cloud", "multithread", "s3", "storage"]
 license = "MIT"
-repository = "github.com/jaeaeich/s3z"
+repository = "https://github.com/jaeaeich/s3z"

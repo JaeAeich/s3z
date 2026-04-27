@@ -4,17 +4,15 @@ napi-build = { workspace = true }
 [dependencies]
 napi = { workspace = true }
 napi-derive = { workspace = true }
-s3z = { path = "../core" }
+s3z = { path = "../../crates/core" }
 tokio = { workspace = true }
 
 [lib]
 crate-type = ["cdylib"]
 name = "s3z_js"
 
-[lints.clippy]
-all = { level = "deny", priority = -1 }
-nursery = { level = "deny", priority = -1 }
-pedantic = { level = "deny", priority = -1 }
+[lints]
+workspace = true
 
 [package]
 description = "Node.js bindings for s3z — S3 ops, but fearlessly fast!"

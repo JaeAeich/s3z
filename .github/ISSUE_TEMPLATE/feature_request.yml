@@ -32,8 +32,8 @@ body:
       options:
         - Core library (crates/core)
         - CLI (crates/cli)
-        - Node.js bindings (crates/node)
-        - Python bindings (crates/python)
+        - Node.js bindings (bindings/node)
+        - Python bindings (bindings/python)
         - New binding / integration
         - Other
 

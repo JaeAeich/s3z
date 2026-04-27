@@ -10,11 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /src
 COPY Cargo.toml Cargo.lock README.md ./
 COPY crates crates
+COPY bindings bindings
 
 RUN --mount=type=cache,target=/src/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo build --release -p s3z-node && \
-    cp target/release/libs3z_js.so crates/node/s3z.node
+    cargo build --release --manifest-path bindings/Cargo.toml -p s3z-node && \
+    cp target/release/libs3z_js.so bindings/node/s3z.node
 
 ###################################################
 # Stage 2: Install deps and build app             #
@@ -24,13 +25,13 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 COPY examples/typescript/package.json examples/typescript/bun.lock* ./
-COPY crates/node/package.json /crates/node/package.json
-COPY --from=native-builder /src/crates/node/*.node /crates/node/
-COPY --from=native-builder /src/crates/node/index.js /crates/node/
-COPY --from=native-builder /src/crates/node/index.d.ts /crates/node/
+COPY bindings/node/package.json /bindings/node/package.json
+COPY --from=native-builder /src/bindings/node/*.node /bindings/node/
+COPY --from=native-builder /src/bindings/node/index.js /bindings/node/
+COPY --from=native-builder /src/bindings/node/index.d.ts /bindings/node/
 
-# Rewrite the file: reference to point at the copied crate
-RUN sed -i 's|file:../../crates/node|file:/crates/node|' package.json
+# Rewrite the file: reference to point at the copied binding
+RUN sed -i 's|file:../../bindings/node|file:/bindings/node|' package.json
 
 RUN bun install --frozen-lockfile || bun install
 
@@ -50,7 +51,7 @@ RUN groupadd --system app && useradd --system --gid app --home /app --shell /bin
     && chown -R app:app /app
 
 COPY --from=builder --chown=app:app /app /app
-COPY --from=builder --chown=app:app /crates /crates
+COPY --from=builder --chown=app:app /bindings /bindings
 
 WORKDIR /app
 USER app

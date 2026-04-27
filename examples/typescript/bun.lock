@@ -7,7 +7,7 @@
       "dependencies": {
         "@elysiajs/swagger": "^1.2",
         "elysia": "^1.2",
-        "s3z": "file:../../crates/node",
+        "s3z": "file:../../bindings/node",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.0",
@@ -84,7 +84,7 @@
 
     "pathe": ["pathe@1.1.2", "", {}, "sha512-whLdWMYL2TwI08hn8/ZqAbrVemu0LNaNNJZX73O6qaIdCTfXutsLhMkjdENX0qhsQ9uIimo4/aQOmXkoon2nDQ=="],
 
-    "s3z": ["s3z@file:../../crates/node", {}],
+    "s3z": ["s3z@file:../../bindings/node", {}],
 
     "strtok3": ["strtok3@10.3.5", "", { "dependencies": { "@tokenizer/token": "^0.3.0" } }, "sha512-ki4hZQfh5rX0QDLLkOCj+h+CVNkqmp/CMf8v8kZpkNVK6jGQooMytqzLZYUVYIZcFZ6yDB70EfD8POcFXiF5oA=="],
 

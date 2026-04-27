@@ -1,16 +1,14 @@
 [dependencies]
 pyo3 = { workspace = true }
-s3z = { path = "../core" }
+s3z = { path = "../../crates/core" }
 tokio = { workspace = true }
 
 [lib]
 crate-type = ["cdylib"]
 name = "s3z_py"
 
-[lints.clippy]
-all = { level = "deny", priority = -1 }
-nursery = { level = "deny", priority = -1 }
-pedantic = { level = "deny", priority = -1 }
+[lints]
+workspace = true
 
 [package]
 description = "Python bindings for s3z — S3 ops, but fearlessly fast!"
