@@ -27,15 +27,41 @@ BENCH_DIR = PROJECT_ROOT / "benchmarks"
 LOCAL_BENCH_DIR = PROJECT_ROOT / "target" / "bench"
 PLOTS_DIR = PROJECT_ROOT / "plots"
 
-TOOL_COLORS: dict[str, str] = {
-    "s3z": "#c8512a",
-    "mc": "#1a1614",
-    "s5cmd": "#5b8a72",
-    "aws": "#3b7dd8",
-}
 TOOL_ORDER = ["s3z", "mc", "s5cmd", "aws"]
-FALLBACK_COLORS = ["#e07b39", "#6c757d", "#28a745", "#17a2b8", "#ffc107", "#dc3545"]
-BG = "#f3ede1"
+
+
+@dataclass(frozen=True)
+class Theme:
+    """Color palette for a plot variant."""
+
+    name: str
+    bg: str
+    fg: str
+    tool_colors: dict[str, str]
+    fallback_colors: list[str]
+    error_color: str
+    text_alpha: float
+
+
+LIGHT = Theme(
+    name="light",
+    bg="#f3ede1",
+    fg="#1a1614",
+    tool_colors={"s3z": "#c8512a", "mc": "#2d2824", "s5cmd": "#5b8a72", "aws": "#3b7dd8"},
+    fallback_colors=["#e07b39", "#6c757d", "#28a745", "#17a2b8", "#ffc107", "#dc3545"],
+    error_color="#1a1614",
+    text_alpha=0.7,
+)
+
+DARK = Theme(
+    name="dark",
+    bg="#171311",
+    fg="#ebe5d8",
+    tool_colors={"s3z": "#e3692f", "mc": "#a89e93", "s5cmd": "#7abf9a", "aws": "#5a9ef0"},
+    fallback_colors=["#f0944a", "#9ea5ad", "#3dd06a", "#2ccce4", "#ffd24d", "#f06272"],
+    error_color="#ebe5d8",
+    text_alpha=0.6,
+)
 
 
 @dataclass(frozen=True)
@@ -86,24 +112,27 @@ def plot_all(source: str = "saved") -> None:
     print(f"Plotting benchmark: {meta.commit_short} ({meta.date}) [profile={meta.profile}]")
 
     PLOTS_DIR.mkdir(exist_ok=True)
-    suffix = ""
 
-    if (run_dir / "upload.csv").exists():
-        _plot_upload(run_dir, meta, suffix)
+    for theme in (LIGHT, DARK):
+        suffix = "" if theme is LIGHT else "-dark"
+        print(f"  theme: {theme.name}")
 
-    if (run_dir / "list.csv").exists():
-        _plot_list(run_dir, meta, suffix)
+        if (run_dir / "upload.csv").exists():
+            _plot_upload(run_dir, meta, suffix, theme)
 
-    if (run_dir / "download.csv").exists():
-        _plot_download(run_dir, meta, suffix)
+        if (run_dir / "list.csv").exists():
+            _plot_list(run_dir, meta, suffix, theme)
+
+        if (run_dir / "download.csv").exists():
+            _plot_download(run_dir, meta, suffix, theme)
 
     print("Done.")
 
 
-def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str) -> None:
+def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> None:
     rows = _read_csv(run_dir / "upload.csv")
     if not rows:
-        print("  skip: no valid upload data")
+        print("    skip: no valid upload data")
         return
 
     backends = list(dict.fromkeys(r.backend for r in rows))
@@ -114,18 +143,11 @@ def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str) -> None:
     total_mb = rows[0].total_mb
 
     fig, (ax_time, ax_rss) = plt.subplots(2, 1, figsize=(12, 9), height_ratios=[3, 2])
-    fig.patch.set_facecolor(BG)
-    ax_time.set_facecolor(BG)
-    ax_rss.set_facecolor(BG)
+    _apply_theme(fig, [ax_time, ax_rss], theme)
 
     _draw_grouped_bars(
-        ax_time,
-        rows,
-        backends,
-        tools,
-        value_attr="mean",
-        err_lo_attr="ci95_half",
-        err_hi_attr="ci95_half",
+        ax_time, rows, backends, tools, theme,
+        value_attr="mean", err_lo_attr="ci95_half", err_hi_attr="ci95_half",
         annotate=lambda r: f"{r.mean:.2f}s",
     )
     ax_time.set_ylabel("Time (seconds, mean ± 95% CI)", fontsize=11, fontfamily="monospace")
@@ -133,65 +155,43 @@ def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str) -> None:
     ax_time.set_xticklabels([])
     ax_time.grid(axis="y", alpha=0.3, zorder=0)
     ax_time.legend(
-        loc="upper right",
-        frameon=True,
-        fancybox=False,
-        edgecolor="#1a1614",
-        fontsize=10,
+        loc="upper right", frameon=True, fancybox=False,
+        edgecolor=theme.fg, fontsize=10,
         prop={"family": "monospace"},
+        labelcolor=theme.fg, facecolor=theme.bg,
     )
 
     _draw_grouped_bars(
-        ax_rss,
-        rows,
-        backends,
-        tools,
-        value_attr="rss_mb",
-        err_lo_attr=None,
-        err_hi_attr=None,
+        ax_rss, rows, backends, tools, theme,
+        value_attr="rss_mb", err_lo_attr=None, err_hi_attr=None,
         annotate=lambda r: f"{r.rss_mb:.0f}",
     )
     ax_rss.set_ylabel("Peak RSS (MB)", fontsize=11, fontfamily="monospace")
     ax_rss.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
     ax_rss.grid(axis="y", alpha=0.3, zorder=0)
 
-    for ax in (ax_time, ax_rss):
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_color("#1a1614")
-        ax.spines["bottom"].set_color("#1a1614")
-        ax.tick_params(colors="#1a1614")
-
     fig.suptitle(
         f"s3z upload  //  {total_mb} MB  //  {meta.commit_short}  //  profile={meta.profile}",
-        fontsize=13,
-        fontfamily="monospace",
-        fontweight="bold",
+        fontsize=13, fontfamily="monospace", fontweight="bold", color=theme.fg,
     )
 
     machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
     fig.text(
-        0.5,
-        0.01,
-        machine,
-        ha="center",
-        fontsize=9,
-        fontfamily="monospace",
-        color="#1a1614",
-        alpha=0.55,
+        0.5, 0.01, machine,
+        ha="center", fontsize=9, fontfamily="monospace", color=theme.fg, alpha=0.55,
     )
 
     plt.tight_layout(rect=(0, 0.04, 1, 0.97))
     out = PLOTS_DIR / f"upload{suffix}.svg"
-    fig.savefig(out, bbox_inches="tight", facecolor=BG)
+    fig.savefig(out, bbox_inches="tight", facecolor=theme.bg)
     plt.close(fig)
-    print(f"  saved: {out}")
+    print(f"    saved: {out}")
 
 
-def _plot_list(run_dir: Path, meta: RunMeta, suffix: str) -> None:
+def _plot_list(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> None:
     rows = _read_csv(run_dir / "list.csv")
     if not rows:
-        print("  skip: no valid list data")
+        print("    skip: no valid list data")
         return
 
     backends = list(dict.fromkeys(r.backend for r in rows))
@@ -202,18 +202,11 @@ def _plot_list(run_dir: Path, meta: RunMeta, suffix: str) -> None:
     file_count = rows[0].total_mb  # reused field holds file count for list
 
     fig, (ax_time, ax_rss) = plt.subplots(2, 1, figsize=(12, 9), height_ratios=[3, 2])
-    fig.patch.set_facecolor(BG)
-    ax_time.set_facecolor(BG)
-    ax_rss.set_facecolor(BG)
+    _apply_theme(fig, [ax_time, ax_rss], theme)
 
     _draw_grouped_bars(
-        ax_time,
-        rows,
-        backends,
-        tools,
-        value_attr="mean",
-        err_lo_attr="ci95_half",
-        err_hi_attr="ci95_half",
+        ax_time, rows, backends, tools, theme,
+        value_attr="mean", err_lo_attr="ci95_half", err_hi_attr="ci95_half",
         annotate=lambda r: f"{r.mean:.3f}s",
     )
     ax_time.set_ylabel("Time (seconds, mean ± 95% CI)", fontsize=11, fontfamily="monospace")
@@ -221,65 +214,43 @@ def _plot_list(run_dir: Path, meta: RunMeta, suffix: str) -> None:
     ax_time.set_xticklabels([])
     ax_time.grid(axis="y", alpha=0.3, zorder=0)
     ax_time.legend(
-        loc="upper right",
-        frameon=True,
-        fancybox=False,
-        edgecolor="#1a1614",
-        fontsize=10,
+        loc="upper right", frameon=True, fancybox=False,
+        edgecolor=theme.fg, fontsize=10,
         prop={"family": "monospace"},
+        labelcolor=theme.fg, facecolor=theme.bg,
     )
 
     _draw_grouped_bars(
-        ax_rss,
-        rows,
-        backends,
-        tools,
-        value_attr="rss_mb",
-        err_lo_attr=None,
-        err_hi_attr=None,
+        ax_rss, rows, backends, tools, theme,
+        value_attr="rss_mb", err_lo_attr=None, err_hi_attr=None,
         annotate=lambda r: f"{r.rss_mb:.0f}",
     )
     ax_rss.set_ylabel("Peak RSS (MB)", fontsize=11, fontfamily="monospace")
     ax_rss.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
     ax_rss.grid(axis="y", alpha=0.3, zorder=0)
 
-    for ax in (ax_time, ax_rss):
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_color("#1a1614")
-        ax.spines["bottom"].set_color("#1a1614")
-        ax.tick_params(colors="#1a1614")
-
     fig.suptitle(
         f"s3z list  //  {file_count} files  //  {meta.commit_short}  //  profile={meta.profile}",
-        fontsize=13,
-        fontfamily="monospace",
-        fontweight="bold",
+        fontsize=13, fontfamily="monospace", fontweight="bold", color=theme.fg,
     )
 
     machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
     fig.text(
-        0.5,
-        0.01,
-        machine,
-        ha="center",
-        fontsize=9,
-        fontfamily="monospace",
-        color="#1a1614",
-        alpha=0.55,
+        0.5, 0.01, machine,
+        ha="center", fontsize=9, fontfamily="monospace", color=theme.fg, alpha=0.55,
     )
 
     plt.tight_layout(rect=(0, 0.03, 1, 0.97))
     out = PLOTS_DIR / f"list{suffix}.svg"
-    fig.savefig(out, bbox_inches="tight", facecolor=BG)
+    fig.savefig(out, bbox_inches="tight", facecolor=theme.bg)
     plt.close(fig)
-    print(f"  saved: {out}")
+    print(f"    saved: {out}")
 
 
-def _plot_download(run_dir: Path, meta: RunMeta, suffix: str) -> None:
+def _plot_download(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> None:
     rows = _read_csv(run_dir / "download.csv")
     if not rows:
-        print("  skip: no valid download data")
+        print("    skip: no valid download data")
         return
 
     backends = list(dict.fromkeys(r.backend for r in rows))
@@ -290,18 +261,11 @@ def _plot_download(run_dir: Path, meta: RunMeta, suffix: str) -> None:
     total_mb = rows[0].total_mb
 
     fig, (ax_time, ax_rss) = plt.subplots(2, 1, figsize=(12, 9), height_ratios=[3, 2])
-    fig.patch.set_facecolor(BG)
-    ax_time.set_facecolor(BG)
-    ax_rss.set_facecolor(BG)
+    _apply_theme(fig, [ax_time, ax_rss], theme)
 
     _draw_grouped_bars(
-        ax_time,
-        rows,
-        backends,
-        tools,
-        value_attr="mean",
-        err_lo_attr="ci95_half",
-        err_hi_attr="ci95_half",
+        ax_time, rows, backends, tools, theme,
+        value_attr="mean", err_lo_attr="ci95_half", err_hi_attr="ci95_half",
         annotate=lambda r: f"{r.mean:.2f}s",
     )
     ax_time.set_ylabel("Time (seconds, mean ± 95% CI)", fontsize=11, fontfamily="monospace")
@@ -309,59 +273,51 @@ def _plot_download(run_dir: Path, meta: RunMeta, suffix: str) -> None:
     ax_time.set_xticklabels([])
     ax_time.grid(axis="y", alpha=0.3, zorder=0)
     ax_time.legend(
-        loc="upper right",
-        frameon=True,
-        fancybox=False,
-        edgecolor="#1a1614",
-        fontsize=10,
+        loc="upper right", frameon=True, fancybox=False,
+        edgecolor=theme.fg, fontsize=10,
         prop={"family": "monospace"},
+        labelcolor=theme.fg, facecolor=theme.bg,
     )
 
     _draw_grouped_bars(
-        ax_rss,
-        rows,
-        backends,
-        tools,
-        value_attr="rss_mb",
-        err_lo_attr=None,
-        err_hi_attr=None,
+        ax_rss, rows, backends, tools, theme,
+        value_attr="rss_mb", err_lo_attr=None, err_hi_attr=None,
         annotate=lambda r: f"{r.rss_mb:.0f}",
     )
     ax_rss.set_ylabel("Peak RSS (MB)", fontsize=11, fontfamily="monospace")
     ax_rss.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
     ax_rss.grid(axis="y", alpha=0.3, zorder=0)
 
-    for ax in (ax_time, ax_rss):
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_color("#1a1614")
-        ax.spines["bottom"].set_color("#1a1614")
-        ax.tick_params(colors="#1a1614")
-
     fig.suptitle(
         f"s3z download  //  {total_mb} MB  //  {meta.commit_short}  //  profile={meta.profile}",
-        fontsize=13,
-        fontfamily="monospace",
-        fontweight="bold",
+        fontsize=13, fontfamily="monospace", fontweight="bold", color=theme.fg,
     )
 
     machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
     fig.text(
-        0.5,
-        0.01,
-        machine,
-        ha="center",
-        fontsize=9,
-        fontfamily="monospace",
-        color="#1a1614",
-        alpha=0.55,
+        0.5, 0.01, machine,
+        ha="center", fontsize=9, fontfamily="monospace", color=theme.fg, alpha=0.55,
     )
 
     plt.tight_layout(rect=(0, 0.03, 1, 0.97))
     out = PLOTS_DIR / f"download{suffix}.svg"
-    fig.savefig(out, bbox_inches="tight", facecolor=BG)
+    fig.savefig(out, bbox_inches="tight", facecolor=theme.bg)
     plt.close(fig)
-    print(f"  saved: {out}")
+    print(f"    saved: {out}")
+
+
+def _apply_theme(fig, axes: list, theme: Theme) -> None:  # noqa: ANN001
+    """Set background and spine/tick colors for a figure and its axes."""
+    fig.patch.set_facecolor(theme.bg)
+    for ax in axes:
+        ax.set_facecolor(theme.bg)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_color(theme.fg)
+        ax.spines["bottom"].set_color(theme.fg)
+        ax.tick_params(colors=theme.fg)
+        ax.yaxis.label.set_color(theme.fg)
+        ax.xaxis.label.set_color(theme.fg)
 
 
 def _read_csv(path: Path) -> list[PlotRow]:
@@ -397,6 +353,7 @@ def _draw_grouped_bars(
     rows: list[PlotRow],
     backends: list[str],
     tools: list[str],
+    theme: Theme,
     *,
     value_attr: str,
     err_lo_attr: str | None,
@@ -426,25 +383,18 @@ def _draw_grouped_bars(
             err_hi.append(getattr(r, err_hi_attr) if err_hi_attr else 0.0)
             annotations.append(annotate(r))
 
+        color = theme.tool_colors.get(
+            tool, theme.fallback_colors[ti % len(theme.fallback_colors)]
+        )
         ax.bar(
-            xs,
-            vals,
-            bar_width,
-            color=TOOL_COLORS.get(tool, FALLBACK_COLORS[ti % len(FALLBACK_COLORS)]),
-            label=tool,
-            zorder=3,
-            edgecolor="none",
+            xs, vals, bar_width,
+            color=color, label=tool, zorder=3, edgecolor="none",
         )
         if err_lo_attr or err_hi_attr:
             ax.errorbar(
-                xs,
-                vals,
-                yerr=[err_lo, err_hi],
-                fmt="none",
-                ecolor="#1a1614",
-                elinewidth=1.2,
-                capsize=3,
-                zorder=4,
+                xs, vals, yerr=[err_lo, err_hi],
+                fmt="none", ecolor=theme.error_color,
+                elinewidth=1.2, capsize=3, zorder=4,
             )
 
         for x, v, hi, txt in zip(xs, vals, err_hi, annotations, strict=True):
@@ -452,12 +402,8 @@ def _draw_grouped_bars(
                 x,
                 v + hi + (max(vals) * 0.02 if vals else 0.05),
                 txt,
-                ha="center",
-                va="bottom",
-                fontsize=7.5,
-                fontfamily="monospace",
-                color="#1a1614",
-                alpha=0.7,
+                ha="center", va="bottom", fontsize=7.5,
+                fontfamily="monospace", color=theme.fg, alpha=theme.text_alpha,
             )
 
     centers = [
@@ -465,4 +411,6 @@ def _draw_grouped_bars(
         for bi in range(len(backends))
     ]
     ax.set_xticks(centers)
-    ax.set_xticklabels(backends, fontfamily="monospace", fontsize=11, fontweight="bold")
+    ax.set_xticklabels(
+        backends, fontfamily="monospace", fontsize=11, fontweight="bold", color=theme.fg,
+    )
