@@ -1,0 +1,35 @@
+[env]
+S3_BUCKET = "{{env.BENCH_BUCKET}}"
+S3_ENDPOINT = "{{env.S3_ENDPOINT_GARAGE}}"
+_.python.venv = { create = true, path = ".venv" }
+
+[settings]
+python.uv_venv_auto = true
+
+[tasks.build]
+description = "Build s3z-python wheel and install into venv"
+run = "maturin develop --release --manifest-path ../../crates/python/Cargo.toml"
+
+[tasks.dev]
+depends = ["install"]
+description = "Start the FastAPI dev server"
+env = { PYTHONPATH = "src" }
+run = "uvicorn server.app:app --reload --host 0.0.0.0 --port 8000"
+
+[tasks.fmt]
+description = "Format the example code"
+run = "uv run ruff format src"
+
+[tasks.install]
+depends = ["build"]
+description = "Install FastAPI dependencies"
+run = "uv pip install fastapi 'uvicorn[standard]' python-multipart"
+
+[tasks.lint]
+description = "Lint and type-check the example code"
+run = "uv run ruff format src && uv run ruff check src && ty check src"
+
+[tools]
+maturin = "1.8"
+python = "3.14"
+uv = "latest"
