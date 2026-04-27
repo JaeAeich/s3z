@@ -146,8 +146,14 @@ def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> Non
     _apply_theme(fig, [ax_time, ax_rss], theme)
 
     _draw_grouped_bars(
-        ax_time, rows, backends, tools, theme,
-        value_attr="mean", err_lo_attr="ci95_half", err_hi_attr="ci95_half",
+        ax_time,
+        rows,
+        backends,
+        tools,
+        theme,
+        value_attr="mean",
+        err_lo_attr="ci95_half",
+        err_hi_attr="ci95_half",
         annotate=lambda r: f"{r.mean:.2f}s",
     )
     ax_time.set_ylabel("Time (seconds, mean ± 95% CI)", fontsize=11, fontfamily="monospace")
@@ -155,15 +161,25 @@ def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> Non
     ax_time.set_xticklabels([])
     ax_time.grid(axis="y", alpha=0.3, zorder=0)
     ax_time.legend(
-        loc="upper right", frameon=True, fancybox=False,
-        edgecolor=theme.fg, fontsize=10,
+        loc="upper right",
+        frameon=True,
+        fancybox=False,
+        edgecolor=theme.fg,
+        fontsize=10,
         prop={"family": "monospace"},
-        labelcolor=theme.fg, facecolor=theme.bg,
+        labelcolor=theme.fg,
+        facecolor=theme.bg,
     )
 
     _draw_grouped_bars(
-        ax_rss, rows, backends, tools, theme,
-        value_attr="rss_mb", err_lo_attr=None, err_hi_attr=None,
+        ax_rss,
+        rows,
+        backends,
+        tools,
+        theme,
+        value_attr="rss_mb",
+        err_lo_attr=None,
+        err_hi_attr=None,
         annotate=lambda r: f"{r.rss_mb:.0f}",
     )
     ax_rss.set_ylabel("Peak RSS (MB)", fontsize=11, fontfamily="monospace")
@@ -172,13 +188,22 @@ def _plot_upload(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> Non
 
     fig.suptitle(
         f"s3z upload  //  {total_mb} MB  //  {meta.commit_short}  //  profile={meta.profile}",
-        fontsize=13, fontfamily="monospace", fontweight="bold", color=theme.fg,
+        fontsize=13,
+        fontfamily="monospace",
+        fontweight="bold",
+        color=theme.fg,
     )
 
     machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
     fig.text(
-        0.5, 0.01, machine,
-        ha="center", fontsize=9, fontfamily="monospace", color=theme.fg, alpha=0.55,
+        0.5,
+        0.01,
+        machine,
+        ha="center",
+        fontsize=9,
+        fontfamily="monospace",
+        color=theme.fg,
+        alpha=0.55,
     )
 
     plt.tight_layout(rect=(0, 0.04, 1, 0.97))
@@ -205,8 +230,14 @@ def _plot_list(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> None:
     _apply_theme(fig, [ax_time, ax_rss], theme)
 
     _draw_grouped_bars(
-        ax_time, rows, backends, tools, theme,
-        value_attr="mean", err_lo_attr="ci95_half", err_hi_attr="ci95_half",
+        ax_time,
+        rows,
+        backends,
+        tools,
+        theme,
+        value_attr="mean",
+        err_lo_attr="ci95_half",
+        err_hi_attr="ci95_half",
         annotate=lambda r: f"{r.mean:.3f}s",
     )
     ax_time.set_ylabel("Time (seconds, mean ± 95% CI)", fontsize=11, fontfamily="monospace")
@@ -214,15 +245,25 @@ def _plot_list(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> None:
     ax_time.set_xticklabels([])
     ax_time.grid(axis="y", alpha=0.3, zorder=0)
     ax_time.legend(
-        loc="upper right", frameon=True, fancybox=False,
-        edgecolor=theme.fg, fontsize=10,
+        loc="upper right",
+        frameon=True,
+        fancybox=False,
+        edgecolor=theme.fg,
+        fontsize=10,
         prop={"family": "monospace"},
-        labelcolor=theme.fg, facecolor=theme.bg,
+        labelcolor=theme.fg,
+        facecolor=theme.bg,
     )
 
     _draw_grouped_bars(
-        ax_rss, rows, backends, tools, theme,
-        value_attr="rss_mb", err_lo_attr=None, err_hi_attr=None,
+        ax_rss,
+        rows,
+        backends,
+        tools,
+        theme,
+        value_attr="rss_mb",
+        err_lo_attr=None,
+        err_hi_attr=None,
         annotate=lambda r: f"{r.rss_mb:.0f}",
     )
     ax_rss.set_ylabel("Peak RSS (MB)", fontsize=11, fontfamily="monospace")
@@ -231,13 +272,22 @@ def _plot_list(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> None:
 
     fig.suptitle(
         f"s3z list  //  {file_count} files  //  {meta.commit_short}  //  profile={meta.profile}",
-        fontsize=13, fontfamily="monospace", fontweight="bold", color=theme.fg,
+        fontsize=13,
+        fontfamily="monospace",
+        fontweight="bold",
+        color=theme.fg,
     )
 
     machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
     fig.text(
-        0.5, 0.01, machine,
-        ha="center", fontsize=9, fontfamily="monospace", color=theme.fg, alpha=0.55,
+        0.5,
+        0.01,
+        machine,
+        ha="center",
+        fontsize=9,
+        fontfamily="monospace",
+        color=theme.fg,
+        alpha=0.55,
     )
 
     plt.tight_layout(rect=(0, 0.03, 1, 0.97))
@@ -264,8 +314,14 @@ def _plot_download(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> N
     _apply_theme(fig, [ax_time, ax_rss], theme)
 
     _draw_grouped_bars(
-        ax_time, rows, backends, tools, theme,
-        value_attr="mean", err_lo_attr="ci95_half", err_hi_attr="ci95_half",
+        ax_time,
+        rows,
+        backends,
+        tools,
+        theme,
+        value_attr="mean",
+        err_lo_attr="ci95_half",
+        err_hi_attr="ci95_half",
         annotate=lambda r: f"{r.mean:.2f}s",
     )
     ax_time.set_ylabel("Time (seconds, mean ± 95% CI)", fontsize=11, fontfamily="monospace")
@@ -273,15 +329,25 @@ def _plot_download(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> N
     ax_time.set_xticklabels([])
     ax_time.grid(axis="y", alpha=0.3, zorder=0)
     ax_time.legend(
-        loc="upper right", frameon=True, fancybox=False,
-        edgecolor=theme.fg, fontsize=10,
+        loc="upper right",
+        frameon=True,
+        fancybox=False,
+        edgecolor=theme.fg,
+        fontsize=10,
         prop={"family": "monospace"},
-        labelcolor=theme.fg, facecolor=theme.bg,
+        labelcolor=theme.fg,
+        facecolor=theme.bg,
     )
 
     _draw_grouped_bars(
-        ax_rss, rows, backends, tools, theme,
-        value_attr="rss_mb", err_lo_attr=None, err_hi_attr=None,
+        ax_rss,
+        rows,
+        backends,
+        tools,
+        theme,
+        value_attr="rss_mb",
+        err_lo_attr=None,
+        err_hi_attr=None,
         annotate=lambda r: f"{r.rss_mb:.0f}",
     )
     ax_rss.set_ylabel("Peak RSS (MB)", fontsize=11, fontfamily="monospace")
@@ -290,13 +356,22 @@ def _plot_download(run_dir: Path, meta: RunMeta, suffix: str, theme: Theme) -> N
 
     fig.suptitle(
         f"s3z download  //  {total_mb} MB  //  {meta.commit_short}  //  profile={meta.profile}",
-        fontsize=13, fontfamily="monospace", fontweight="bold", color=theme.fg,
+        fontsize=13,
+        fontfamily="monospace",
+        fontweight="bold",
+        color=theme.fg,
     )
 
     machine = f"{meta.os} {meta.arch} / {meta.cpus} cores / {meta.memory_gb} GB"
     fig.text(
-        0.5, 0.01, machine,
-        ha="center", fontsize=9, fontfamily="monospace", color=theme.fg, alpha=0.55,
+        0.5,
+        0.01,
+        machine,
+        ha="center",
+        fontsize=9,
+        fontfamily="monospace",
+        color=theme.fg,
+        alpha=0.55,
     )
 
     plt.tight_layout(rect=(0, 0.03, 1, 0.97))
@@ -383,18 +458,26 @@ def _draw_grouped_bars(
             err_hi.append(getattr(r, err_hi_attr) if err_hi_attr else 0.0)
             annotations.append(annotate(r))
 
-        color = theme.tool_colors.get(
-            tool, theme.fallback_colors[ti % len(theme.fallback_colors)]
-        )
+        color = theme.tool_colors.get(tool, theme.fallback_colors[ti % len(theme.fallback_colors)])
         ax.bar(
-            xs, vals, bar_width,
-            color=color, label=tool, zorder=3, edgecolor="none",
+            xs,
+            vals,
+            bar_width,
+            color=color,
+            label=tool,
+            zorder=3,
+            edgecolor="none",
         )
         if err_lo_attr or err_hi_attr:
             ax.errorbar(
-                xs, vals, yerr=[err_lo, err_hi],
-                fmt="none", ecolor=theme.error_color,
-                elinewidth=1.2, capsize=3, zorder=4,
+                xs,
+                vals,
+                yerr=[err_lo, err_hi],
+                fmt="none",
+                ecolor=theme.error_color,
+                elinewidth=1.2,
+                capsize=3,
+                zorder=4,
             )
 
         for x, v, hi, txt in zip(xs, vals, err_hi, annotations, strict=True):
@@ -402,8 +485,12 @@ def _draw_grouped_bars(
                 x,
                 v + hi + (max(vals) * 0.02 if vals else 0.05),
                 txt,
-                ha="center", va="bottom", fontsize=7.5,
-                fontfamily="monospace", color=theme.fg, alpha=theme.text_alpha,
+                ha="center",
+                va="bottom",
+                fontsize=7.5,
+                fontfamily="monospace",
+                color=theme.fg,
+                alpha=theme.text_alpha,
             )
 
     centers = [
@@ -412,5 +499,9 @@ def _draw_grouped_bars(
     ]
     ax.set_xticks(centers)
     ax.set_xticklabels(
-        backends, fontfamily="monospace", fontsize=11, fontweight="bold", color=theme.fg,
+        backends,
+        fontfamily="monospace",
+        fontsize=11,
+        fontweight="bold",
+        color=theme.fg,
     )
