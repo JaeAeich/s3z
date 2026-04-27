@@ -1,0 +1,83 @@
+# Publish the s3z core library crate to crates.io.
+#
+# Tag pushes publish the tagged version as stable.
+# Branch pushes (release/**, rust/**) are dry-run only — crates.io
+# does not support dev/pre-release uploads the way PyPI and npm do.
+
+name: Release Rust
+
+on:
+  push:
+    tags:
+      - "**[0-9]+.[0-9]+.[0-9]+*"
+    branches:
+      - "release/**"
+      - "rust/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            V="${GITHUB_REF#refs/tags/}"
+            V="${V#v}"
+            echo "version=$V" >> "$GITHUB_OUTPUT"
+            echo "is-prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            CARGO_VERSION=$(grep -m1 '^version' crates/core/Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+            echo "version=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
+            echo "is-prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  check:
+    name: Verify crate builds and packages
+    needs: [version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: rust-publish-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Dry-run publish
+        run: cargo publish -p s3z --dry-run
+
+  publish:
+    name: Publish to crates.io
+    needs: [version, check]
+    if: ${{ github.event_name == 'push' && needs.version.outputs.is-prerelease == 'false' }}
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish s3z to crates.io
+        run: cargo publish -p s3z
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
