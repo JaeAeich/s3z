@@ -1,0 +1,192 @@
+# Based on the napi-rs CI template, generated with:
+#   npx napi new s3z --enable-github-actions --enable-default-targets --enable-all-targets
+#
+# Customised for s3z: version computation, pre-release publishing,
+# branch triggers, and target trimming (no Windows i686, Android, WASI, FreeBSD).
+
+name: Release Node
+
+on:
+  push:
+    tags:
+      - "**[0-9]+.[0-9]+.[0-9]+*"
+    branches:
+      - "release/**"
+      - "node/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-node-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: s3z
+  WORKING_DIR: bindings/node
+  MACOSX_DEPLOYMENT_TARGET: "10.13"
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            V="${GITHUB_REF#refs/tags/}"
+            V="${V#v}"
+            echo "version=$V" >> "$GITHUB_OUTPUT"
+            echo "is-prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            PKG_VERSION=$(node -p "require('./bindings/node/package.json').version")
+            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+            echo "version=${PKG_VERSION}-dev.${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+            echo "is-prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: build - ${{ matrix.settings.target }}
+    needs: [version]
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-latest
+            target: x86_64-apple-darwin
+          - host: macos-latest
+            target: aarch64-apple-darwin
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            use-zig: true
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            use-zig: true
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            use-zig: true
+    runs-on: ${{ matrix.settings.host }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/.napi-rs
+            .cargo-cache
+            bindings/target/
+          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
+
+      - name: Install zig
+        if: ${{ matrix.settings.use-zig }}
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Install cargo-zigbuild
+        if: ${{ matrix.settings.use-zig }}
+        uses: taiki-e/install-action@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          tool: cargo-zigbuild
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm install
+
+      - name: Build native addon
+        working-directory: ${{ env.WORKING_DIR }}
+        shell: bash
+        run: |
+          BUILD_FLAGS="--platform --release --target ${{ matrix.settings.target }} --manifest-path Cargo.toml --output-dir ./artifacts"
+          if [[ "${{ matrix.settings.use-zig }}" == "true" ]]; then
+            npx napi build $BUILD_FLAGS -x
+          else
+            npx napi build $BUILD_FLAGS
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: ${{ env.WORKING_DIR }}/artifacts/*.node
+          if-no-files-found: error
+
+  publish:
+    name: Publish to npm
+    needs: [version, build]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: bindings-*
+          path: ${{ env.WORKING_DIR }}/artifacts
+          merge-multiple: true
+
+      - name: Set package version
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version --allow-same-version
+
+      - name: Install dependencies and create npm dirs
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          npm install
+          npx napi create-npm-dirs --package-json-path package.json
+
+      - name: Move artifacts to platform packages
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npx napi artifacts --package-json-path package.json --build-output-dir artifacts
+
+      - name: List packages
+        working-directory: ${{ env.WORKING_DIR }}
+        run: ls -lR npm/
+
+      - name: Publish to npm
+        if: ${{ needs.version.outputs.is-prerelease == 'false' }}
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to npm (dev)
+        if: ${{ needs.version.outputs.is-prerelease == 'true' }}
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm publish --access public --provenance --tag dev
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
