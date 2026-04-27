@@ -1,0 +1,135 @@
+name: Bump & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - pre-release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bump-release
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump version, changelog, and tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-edit,git-cliff
+
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          CURRENT=$(grep -m1 '^version' crates/cli/Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+          BUMP="${{ inputs.bump }}"
+          BASE=$(echo "$CURRENT" | sed 's/-.*//')
+
+          if [ "$BUMP" = "pre-release" ]; then
+            # Increment rc.N if already a pre-release, otherwise bump minor + rc.1.
+            if echo "$CURRENT" | grep -q -- '-rc\.'; then
+              NUM=$(echo "$CURRENT" | grep -oE 'rc\.[0-9]+' | grep -oE '[0-9]+$')
+              NEW="${BASE}-rc.$((NUM + 1))"
+            else
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+              NEW="${MAJOR}.$((MINOR + 1)).0-rc.1"
+            fi
+            echo "new=$NEW" >> "$GITHUB_OUTPUT"
+            echo "mode=set" >> "$GITHUB_OUTPUT"
+          elif [ "$BUMP" = "patch" ] && echo "$CURRENT" | grep -q '-'; then
+            # patch on pre-release: promote to stable (strip suffix).
+            echo "new=$BASE" >> "$GITHUB_OUTPUT"
+            echo "mode=set" >> "$GITHUB_OUTPUT"
+          else
+            # For minor/major (even from pre-release), let cargo bump from BASE.
+            # First reset to base if on a pre-release, then bump.
+            if echo "$CURRENT" | grep -q '-'; then
+              echo "new=$BASE" >> "$GITHUB_OUTPUT"
+              echo "mode=set-then-bump" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=bump" >> "$GITHUB_OUTPUT"
+            fi
+            echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump Cargo.toml versions
+        shell: bash
+        run: |
+          MODE="${{ steps.version.outputs.mode }}"
+
+          if [ "$MODE" = "set-then-bump" ]; then
+            # Reset to base version first (strip pre-release), then bump.
+            cargo set-version --workspace "${{ steps.version.outputs.new }}"
+            cargo set-version --workspace "${{ steps.version.outputs.new }}" --manifest-path bindings/Cargo.toml
+            cargo set-version "${{ steps.version.outputs.new }}" --manifest-path examples/rust/Cargo.toml
+            # Now bump from the base.
+            cargo set-version --workspace --bump ${{ steps.version.outputs.bump }}
+            cargo set-version --workspace --bump ${{ steps.version.outputs.bump }} --manifest-path bindings/Cargo.toml
+            cargo set-version --bump ${{ steps.version.outputs.bump }} --manifest-path examples/rust/Cargo.toml
+          elif [ "$MODE" = "bump" ]; then
+            cargo set-version --workspace --bump ${{ steps.version.outputs.bump }}
+            cargo set-version --workspace --bump ${{ steps.version.outputs.bump }} --manifest-path bindings/Cargo.toml
+            cargo set-version --bump ${{ steps.version.outputs.bump }} --manifest-path examples/rust/Cargo.toml
+          else
+            cargo set-version --workspace "${{ steps.version.outputs.new }}"
+            cargo set-version --workspace "${{ steps.version.outputs.new }}" --manifest-path bindings/Cargo.toml
+            cargo set-version "${{ steps.version.outputs.new }}" --manifest-path examples/rust/Cargo.toml
+          fi
+
+      - name: Read final version
+        id: final
+        run: |
+          NEW=$(grep -m1 '^version' crates/cli/Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
+          echo "Version: $NEW"
+
+      - name: Bump pyproject.toml versions
+        run: |
+          sed -i "s/^version = .*/version = \"${{ steps.final.outputs.version }}\"/" \
+            bindings/python/pyproject.toml \
+            examples/python/pyproject.toml \
+            bench/pyproject.toml
+
+      - name: Bump package.json versions
+        run: |
+          npm version ${{ steps.final.outputs.version }} --no-git-tag-version --prefix bindings/node
+          npm version ${{ steps.final.outputs.version }} --no-git-tag-version --prefix examples/typescript
+
+      - name: Generate changelog
+        run: git-cliff --tag ${{ steps.final.outputs.tag }} -o CHANGELOG.md
+
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): ${{ steps.final.outputs.tag }}"
+          git tag -a "${{ steps.final.outputs.tag }}" -m "${{ steps.final.outputs.tag }}"
+          git push origin main "${{ steps.final.outputs.tag }}"
