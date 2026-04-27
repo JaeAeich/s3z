@@ -2,11 +2,12 @@ pre-commit:
   parallel: true
   commands:
     editorconfig:
+      glob: "**/*.{toml,yaml,yml,json,md,rs,py,ts,tsx,js,mjs}"
       run: mise x -- eclint fix {staged_files}
       stage_fixed: true
 
     toml-hygiene:
-      glob: "{*.toml,**/*.toml}"
+      glob: "**/*.toml"
       run: >
         mise x -- toml-sort --in-place --all --trailing-comma-inline-array {staged_files}
         && mise x -- taplo format {staged_files}
@@ -25,6 +26,18 @@ pre-commit:
     clippy:
       glob: "**/*.rs"
       run: cargo clippy --all-targets --all-features -- -D warnings
+
+    ruff-format:
+      glob: "bench/**/*.py"
+      root: bench
+      run: uv run ruff format {staged_files}
+      stage_fixed: true
+
+    ruff-check:
+      glob: "bench/**/*.py"
+      root: bench
+      run: uv run ruff check --fix {staged_files}
+      stage_fixed: true
 
 commit-msg:
   commands:
