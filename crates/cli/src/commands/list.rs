@@ -28,7 +28,7 @@ pub(crate) async fn run(client: &S3Client, args: &ListArgs, quiet: bool) -> anyh
 
     if !quiet {
         println!();
-        println!("{} object(s), {} total", total_objects, fmt::bytes(total_size),);
+        println!("{} object(s), {} total", total_objects, fmt::bytes(total_size));
     }
 
     Ok(())

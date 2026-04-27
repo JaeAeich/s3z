@@ -1,7 +1,7 @@
 ###################################################
 # Stage 1: Build the binary                       #
 ###################################################
-FROM rust:1.93-bookworm AS builder
+FROM rust:1.95-bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config && \
