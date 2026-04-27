@@ -13,6 +13,28 @@
 
 A very lightweight, high-throughput S3 library/client.
 
+## Install
+
+The quickest way — downloads the right binary for your platform:
+
+```sh
+# macOS / Linux
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jaeaeich/s3z/releases/latest/download/s3z-cli-installer.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/jaeaeich/s3z/releases/latest/download/s3z-cli-installer.ps1 | iex"
+```
+
+### Other methods
+
+```sh
+# Build from source
+cargo install --git https://github.com/jaeaeich/s3z s3z-cli
+
+# Pre-built binary via cargo-binstall
+cargo binstall s3z-cli
+```
+
 ## Benchmarks
 
 Benchmarked against `mc`, `s5cmd`, and `aws-cli` on dockerized S3 backends.
