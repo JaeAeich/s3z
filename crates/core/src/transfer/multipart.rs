@@ -105,7 +105,7 @@ async fn abort(
     upload_id: &str,
 ) -> Result<()> {
     let uri: Uri =
-        format!("{}/{bucket}/{}?uploadId={upload_id}", config.endpoint_url(), key.encoded(),)
+        format!("{}/{bucket}/{}?uploadId={upload_id}", config.endpoint_url(), key.encoded())
             .parse()?;
 
     let req = build_signed(Method::DELETE, uri, Bytes::new(), creds, &config.region)?;
@@ -129,7 +129,7 @@ async fn complete(
     xml.push_str("</CompleteMultipartUpload>");
 
     let uri: Uri =
-        format!("{}/{bucket}/{}?uploadId={upload_id}", config.endpoint_url(), key.encoded(),)
+        format!("{}/{bucket}/{}?uploadId={upload_id}", config.endpoint_url(), key.encoded())
             .parse()?;
 
     let req = build_signed(Method::POST, uri, Bytes::from(xml), creds, &config.region)?;

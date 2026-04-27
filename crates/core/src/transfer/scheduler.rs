@@ -105,7 +105,6 @@ pub(crate) fn plan_parts(file_size: u64, config: &TransferConfig) -> Vec<Part> {
         "file requires {num_parts} parts but S3 allows at most {MAX_S3_PARTS}; increase part_size"
     );
 
-    let num_parts = file_size.div_ceil(config.part_size);
     let capacity = usize::try_from(num_parts).unwrap_or(usize::MAX);
     let mut parts = Vec::with_capacity(capacity);
     let mut remaining = file_size;

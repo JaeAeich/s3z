@@ -95,8 +95,8 @@ impl UploadRequest {
     /// Each part is streamed from disk through a 256 KiB buffer, so peak
     /// memory per file is roughly `concurrency_per_file * 256 KiB`.
     ///
-    /// Note: actual per-file concurrency is dynamically scaled by
-    /// [`scheduler::concurrency_for_size`] based on each file's size.
+    /// Note: actual per-file concurrency is dynamically scaled based
+    /// on each file's size.
     #[inline]
     #[must_use]
     pub fn new(

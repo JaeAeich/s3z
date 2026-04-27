@@ -48,7 +48,7 @@ pub struct TransferConfig {
     /// Default part size hint (bytes). For multipart uploads, the actual
     /// part size is auto-computed from file size and concurrency — this
     /// value is used only as the fallback for `plan_parts` when called
-    /// directly. See [`crate::transfer::scheduler::compute_part_size`].
+    /// directly. The scheduler auto-computes the optimal part size.
     pub part_size: u64,
 }
 
