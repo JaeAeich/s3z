@@ -26,7 +26,10 @@ high-throughput S3 library built in Rust.
 ## Install
 
 ```bash
-npm install @jae_aeich/s3z
+npm install @jae_aeich/s3z   # npm
+pnpm add @jae_aeich/s3z      # pnpm
+yarn add @jae_aeich/s3z      # yarn
+bun add @jae_aeich/s3z       # bun
 ```
 
 ## Quick start
@@ -64,7 +67,7 @@ const client = await S3Client.create({
   region: "us-east-1",
   accessKey: "access-key",
   secretKey: "secret-key",
-  endpoint: "http://localhost:9000", // MinIO, R2, GCS, etc.
+  endpoint: "http://localhost:9000", // MinIO, SeaweedFS, Garage, etc.
 });
 ```
 

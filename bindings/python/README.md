@@ -26,7 +26,9 @@ high-throughput S3 library built in Rust.
 ## Install
 
 ```bash
+uv add s3z        # recommended
 pip install s3z
+pipx install s3z  # isolated install
 ```
 
 ## Quick start
@@ -57,7 +59,7 @@ from s3z import Config, S3Client, static_credentials
 config = Config(
     "us-east-1",
     static_credentials("access-key", "secret-key"),
-    endpoint="http://localhost:9000",  # MinIO, R2, GCS, etc.
+    endpoint="http://localhost:9000",  # MinIO, SeaweedFS, Garage, etc.
 )
 client = S3Client(config)
 ```
