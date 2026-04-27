@@ -1,0 +1,20 @@
+[[bin]]
+name = "s3z-axum"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+axum = { features = ["multipart"], version = "0.8" }
+s3z = { path = "../../crates/core" }
+serde = { features = ["derive"], version = "1" }
+tempfile = "3"
+tokio = { features = ["macros", "rt-multi-thread"], version = "1" }
+utoipa = { features = ["axum_extras"], version = "5" }
+utoipa-scalar = { features = ["axum"], version = "0.3" }
+
+[package]
+edition = "2024"
+license = "MIT"
+name = "s3z-axum-example"
+publish = false
+version = "0.1.0"
