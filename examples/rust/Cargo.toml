@@ -17,4 +17,4 @@ edition = "2024"
 license = "MIT"
 name = "s3z-axum-example"
 publish = false
-version = "0.0.0"
+version = "0.1.0-rc.1"
