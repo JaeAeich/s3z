@@ -1,0 +1,106 @@
+---
+title: CLI
+description: ""
+---
+
+<div className="not-prose -mt-2 mb-4 flex items-center gap-3 text-sm text-fd-muted-foreground">
+  <a href="https://github.com/JaeAeich/s3z/tree/main/crates/cli" className="inline-flex items-center gap-1.5 text-[#c8512a] hover:underline no-underline">
+    <span className="font-mono font-semibold">GitHub</span> <span>↗</span>
+  </a>
+</div>
+
+## Install
+
+<Tabs items={['Shell', 'Cargo']} persist={{ id: 'cli-install' }}>
+<Tab value="Shell">
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jaeaeich/s3z/releases/latest/download/s3z-cli-installer.sh | sh
+```
+</Tab>
+<Tab value="Cargo">
+```bash
+cargo install --git https://github.com/jaeaeich/s3z s3z-cli
+```
+</Tab>
+</Tabs>
+
+## Global options
+
+These apply to all commands:
+
+| Flag | Env var | Default | Description |
+|---|---|---|---|
+| `-r, --region` | `AWS_DEFAULT_REGION` | `us-east-1` | AWS region |
+| `-e, --endpoint` | `AWS_ENDPOINT_URL` | — | Custom S3 endpoint |
+| `--access-key` | `AWS_ACCESS_KEY_ID` | — | AWS access key |
+| `--secret-key` | `AWS_SECRET_ACCESS_KEY` | — | AWS secret key |
+| `-q, --quiet` | — | `false` | Suppress output except errors |
+
+## Commands
+
+### upload
+
+Upload files or directories to S3.
+
+```bash
+s3z upload ./data ./report.csv -b my-bucket -p uploads/
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `<sources>` | — | Local paths to upload (required) |
+| `-b, --bucket` | — | Destination S3 bucket |
+| `-p, --prefix` | `""` | Key prefix in the bucket |
+| `-w, --workers` | `32` | Files uploaded in parallel |
+| `-c, --concurrency` | `8` | Parts per file concurrency |
+
+### download
+
+Download objects from S3 to a local directory.
+
+```bash
+s3z download -b my-bucket -p uploads/ -d ./out
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-b, --bucket` | — | Source S3 bucket |
+| `-p, --prefix` | `""` | Key prefix to download |
+| `-d, --dest` | `.` | Local destination directory |
+| `-w, --workers` | auto | Files downloaded in parallel |
+| `-c, --concurrency` | auto | Parts per file concurrency |
+
+### ls
+
+List objects in an S3 bucket.
+
+```bash
+s3z ls -b my-bucket -p uploads/
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-b, --bucket` | — | S3 bucket to list |
+| `-p, --prefix` | `""` | Key prefix to filter by |
+
+## Examples
+
+Upload a directory to MinIO:
+
+```bash
+s3z -e http://localhost:9000 upload ./data -b test-bucket -p backups/
+```
+
+Download with custom credentials:
+
+```bash
+s3z --access-key minioadmin --secret-key minioadmin \
+    -e http://localhost:9000 \
+    download -b test-bucket -d ./restored
+```
+
+List everything in a bucket:
+
+```bash
+s3z ls -b my-bucket
+```

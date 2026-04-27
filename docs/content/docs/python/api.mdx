@@ -1,0 +1,169 @@
+---
+title: Reference
+description: ""
+---
+
+## S3Client
+
+The main client. All S3 operations go through this class.
+
+```python
+from s3z import Config, S3Client, CredentialSource
+
+config = Config("us-east-1", CredentialSource.Env)
+client = S3Client(config)
+```
+
+### Methods
+
+| Method | Returns | Description |
+|---|---|---|
+| `client.upload(...)` | `list[FileUploadResult]` | Upload files and directories to S3. |
+| `client.download(...)` | `list[FileDownloadResult]` | Download objects to a local directory. |
+| `client.list(...)` | `list[ObjectInfo]` | List all objects under a prefix. |
+
+### upload
+
+Upload local files and directories to S3. Directories are walked recursively.
+Files are split into parts and uploaded in parallel.
+
+```python
+results = client.upload(
+    ["./data", "./report.csv"],
+    "my-bucket",
+    "uploads/",
+    workers=16,              # files in parallel (default: 32)
+    concurrency_per_file=4,  # parts per file (default: 8)
+)
+
+for f in results:
+    print(f"{f.source} → s3://{f.key} ({f.parts} parts, {f.size} bytes)")
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `sources` | `list[str]` | — | Local paths to upload. |
+| `bucket` | `str` | — | Target S3 bucket. |
+| `prefix` | `str` | — | Key prefix in the bucket. |
+| `workers` | `int \| None` | `None` | Files uploaded in parallel. |
+| `concurrency_per_file` | `int \| None` | `None` | Parts per file concurrency. |
+
+### download
+
+Download all objects under a prefix to a local directory. The prefix
+structure is preserved on disk.
+
+```python
+results = client.download(
+    "my-bucket",
+    "uploads/",
+    "./out",
+)
+
+for f in results:
+    print(f"s3://{f.key} → {f.dest}")
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `bucket` | `str` | — | Source S3 bucket. |
+| `prefix` | `str` | — | Key prefix. |
+| `dest_dir` | `str` | — | Local destination directory. |
+| `workers` | `int \| None` | `None` | Files downloaded in parallel. |
+| `concurrency_per_file` | `int \| None` | `None` | Parts per file concurrency. |
+
+### list
+
+List all objects under a prefix. Handles pagination automatically.
+
+```python
+objects = client.list(
+    "my-bucket",
+    "uploads/",
+    delimiter="/",  # optional — group by "directory"
+)
+
+for obj in objects:
+    print(f"{obj.key} ({obj.size} bytes, modified {obj.last_modified})")
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `bucket` | `str` | — | S3 bucket. |
+| `prefix` | `str` | — | Key prefix. |
+| `delimiter` | `str \| None` | `None` | Delimiter for directory grouping. |
+
+## Configuration
+
+### Config
+
+```python
+Config(region, credential_source=None, endpoint=None)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `region` | `str` | — | AWS region (e.g. `"us-east-1"`). |
+| `credential_source` | `CredentialSource \| StaticCredentials \| None` | `CredentialSource.Env` | How to obtain AWS credentials. |
+| `endpoint` | `str \| None` | `None` | Custom endpoint for S3-compatible backends. |
+
+**Properties:**
+
+| Property | Type | Description |
+|---|---|---|
+| `endpoint_url` | `str` | The resolved endpoint URL. |
+| `region` | `str` | The AWS region. |
+
+### CredentialSource
+
+Enum for credential resolution.
+
+| Variant | Description |
+|---|---|
+| `CredentialSource.Env` | Read from `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars. |
+
+### static\_credentials
+
+```python
+creds = static_credentials("my-access-key", "my-secret-key")
+config = Config("us-east-1", creds, endpoint="http://localhost:9000")
+```
+
+Create a credential source from explicit keys. Use this for S3-compatible
+backends like MinIO, SeaweedFS, or Garage.
+
+## Results
+
+### FileUploadResult
+
+Returned per file from `upload()`.
+
+| Field | Type | Description |
+|---|---|---|
+| `etag` | `str` | ETag returned by S3. |
+| `key` | `str` | S3 object key. |
+| `parts` | `int` | Number of parts used (1 = single PUT). |
+| `size` | `int` | File size in bytes. |
+| `source` | `str` | Local source path. |
+
+### FileDownloadResult
+
+Returned per file from `download()`.
+
+| Field | Type | Description |
+|---|---|---|
+| `dest` | `str` | Local path the file was written to. |
+| `key` | `str` | S3 key that was downloaded. |
+| `parts` | `int` | Number of parts used. |
+| `size` | `int` | File size in bytes. |
+
+### ObjectInfo
+
+Returned per object from `list()`.
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | `str` | Object key. |
+| `size` | `int` | Object size in bytes. |
+| `etag` | `str` | ETag. |
+| `last_modified` | `str` | Last modified timestamp (ISO 8601). |

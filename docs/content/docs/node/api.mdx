@@ -1,0 +1,135 @@
+---
+title: Reference
+description: ""
+---
+
+## S3Client
+
+The main client. All S3 operations go through this class.
+
+Use the async factory `S3Client.create()` — the constructor is not public.
+
+```typescript
+import { S3Client } from "@jae_aeich/s3z";
+
+const client = await S3Client.create({
+  region: "us-east-1",
+});
+```
+
+### Methods
+
+| Method | Returns | Description |
+|---|---|---|
+| `S3Client.create(config)` | `Promise<S3Client>` | Create a new client. |
+| `client.upload(options)` | `Promise<FileUploadResult[]>` | Upload files and directories to S3. |
+| `client.download(options)` | `Promise<FileDownloadResult[]>` | Download objects to a local directory. |
+| `client.list(options)` | `Promise<ObjectInfo[]>` | List all objects under a prefix. |
+
+### upload
+
+Upload local files and directories to S3. Directories are walked recursively.
+Files are split into parts and uploaded in parallel.
+
+```typescript
+const results = await client.upload({
+  sources: ["./data", "./report.csv"],
+  bucket: "my-bucket",
+  prefix: "uploads/",
+  workers: 16,              // files in parallel (default: 32)
+  concurrencyPerFile: 4,    // parts per file (default: 8)
+});
+
+for (const f of results) {
+  console.log(`${f.source} → s3://${f.key} (${f.parts} parts, ${f.size} bytes)`);
+}
+```
+
+### download
+
+Download all objects under a prefix to a local directory. The prefix
+structure is preserved on disk.
+
+```typescript
+const results = await client.download({
+  bucket: "my-bucket",
+  prefix: "uploads/",
+  destDir: "./out",
+});
+
+for (const f of results) {
+  console.log(`s3://${f.key} → ${f.dest}`);
+}
+```
+
+### list
+
+List all objects under a prefix. Handles pagination automatically.
+
+```typescript
+const objects = await client.list({
+  bucket: "my-bucket",
+  prefix: "uploads/",
+  delimiter: "/",  // optional — group by "directory"
+});
+
+for (const obj of objects) {
+  console.log(`${obj.key} (${obj.size} bytes, modified ${obj.lastModified})`);
+}
+```
+
+## Configuration
+
+### S3Config
+
+Passed to `S3Client.create()`.
+
+<AutoTypeTable path="../bindings/node/index.d.ts" name="S3Config" />
+
+If `accessKey` and `secretKey` are omitted, credentials are read from the
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables.
+
+Set `endpoint` for S3-compatible backends:
+
+```typescript
+const client = await S3Client.create({
+  region: "us-east-1",
+  accessKey: "minioadmin",
+  secretKey: "minioadmin",
+  endpoint: "http://localhost:9000",
+});
+```
+
+## Options
+
+### UploadOptions
+
+<AutoTypeTable path="../bindings/node/index.d.ts" name="UploadOptions" />
+
+### DownloadOptions
+
+<AutoTypeTable path="../bindings/node/index.d.ts" name="DownloadOptions" />
+
+### ListOptions
+
+<AutoTypeTable path="../bindings/node/index.d.ts" name="ListOptions" />
+
+## Results
+
+### FileUploadResult
+
+Returned per file from `upload()`.
+
+<AutoTypeTable path="../bindings/node/index.d.ts" name="FileUploadResult" />
+
+### FileDownloadResult
+
+Returned per file from `download()`.
+
+<AutoTypeTable path="../bindings/node/index.d.ts" name="FileDownloadResult" />
+
+### ObjectInfo
+
+Returned per object from `list()`.
+
+<AutoTypeTable path="../bindings/node/index.d.ts" name="ObjectInfo" />

@@ -1,0 +1,66 @@
+---
+title: s3z
+description: S3 ops, but fearlessly fast.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+
+<div className="not-prose mb-10 flex flex-col items-center gap-5 border-b-2 border-[#c8512a] pb-10">
+  <span className="font-mono text-8xl font-extrabold italic tracking-tighter leading-none">
+    s<span className="text-[#c8512a]">3</span>z
+  </span>
+  <span className="block text-center text-xl text-fd-muted-foreground">
+    S3 ops, but fearlessly fast.
+  </span>
+  <span className="block text-center text-sm text-fd-muted-foreground tracking-widest uppercase">
+    Built in Rust — Streaming — Parallel — No bloat
+  </span>
+</div>
+
+A lightweight, high-throughput S3 library built in Rust with bindings for
+Python, Node.js, and the CLI. No AWS SDK — just raw HTTP, SigV4 signing,
+and parallel streaming.
+
+Works with **any S3-compatible backend** — AWS S3, MinIO, SeaweedFS, Garage,
+and more.
+
+## Get started
+
+<Cards>
+  <Card
+    title="Rust"
+    description="cargo add s3z"
+    href="/docs/rust"
+  />
+  <Card
+    title="Python"
+    description="uv add s3z"
+    href="/docs/python"
+  />
+  <Card
+    title="Node.js"
+    description="npm install @jae_aeich/s3z"
+    href="/docs/node"
+  />
+</Cards>
+
+## Why s3z?
+
+<div className="not-prose my-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+  <div className="border-l-2 border-[#c8512a] pl-4 py-2">
+    <span className="block font-semibold">Fast</span>
+    <span className="text-sm text-fd-muted-foreground">Written in Rust and optimized for parallel workloads — concurrent uploads, downloads, and streaming throughput out of the box.</span>
+  </div>
+  <div className="border-l-2 border-[#c8512a] pl-4 py-2">
+    <span className="block font-semibold">Small</span>
+    <span className="text-sm text-fd-muted-foreground">Hand-rolled S3 implementation with minimal dependencies. Full control over the protocol without the bloat of an SDK.</span>
+  </div>
+  <div className="border-l-2 border-[#c8512a] pl-4 py-2">
+    <span className="block font-semibold">Native</span>
+    <span className="text-sm text-fd-muted-foreground">Rust core with zero-copy bindings to Python and Node.js — you get Rust-level performance in your language of choice.</span>
+  </div>
+  <div className="border-l-2 border-[#c8512a] pl-4 py-2">
+    <span className="block font-semibold">Simple</span>
+    <span className="text-sm text-fd-muted-foreground">Built for simplicity, with developers in mind. Clean APIs that do what you expect — no surprises, no ceremony.</span>
+  </div>
+</div>

@@ -1,0 +1,71 @@
+---
+title: Benchmarks
+description: ""
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## Methodology
+
+All benchmarks run on **dockerized S3 backends** — MinIO, Garage, SeaweedFS,
+and RustFS — using mixed file sizes. Each tool is tested with default settings
+unless otherwise noted.
+
+Tools compared:
+
+| Tool | Language | Notes |
+|---|---|---|
+| **s3z** | Rust | This library |
+| `s5cmd` | Go | Popular parallel S3 client |
+| `mc` | Go | MinIO client |
+| `aws-cli` | Python | Official AWS CLI |
+
+<Callout type="warn">
+  These benchmarks measure **tool throughput in isolation** on local
+  dockerized backends. They do not represent production AWS S3 latency
+  or real-world network conditions.
+</Callout>
+
+## Results
+
+### Upload
+
+<div className="not-prose my-4 overflow-hidden border border-fd-border">
+  <div className="border-b border-[#c8512a] bg-fd-card px-4 py-2 text-xs font-semibold uppercase tracking-widest text-fd-muted-foreground">Upload throughput</div>
+  <img src="https://raw.githubusercontent.com/JaeAeich/s3z/main/plots/upload.svg" alt="upload benchmark" className="w-full dark:hidden" />
+  <img src="https://raw.githubusercontent.com/JaeAeich/s3z/main/plots/upload-dark.svg" alt="upload benchmark" className="w-full hidden dark:block" />
+</div>
+
+### Download
+
+<div className="not-prose my-4 overflow-hidden border border-fd-border">
+  <div className="border-b border-[#c8512a] bg-fd-card px-4 py-2 text-xs font-semibold uppercase tracking-widest text-fd-muted-foreground">Download throughput</div>
+  <img src="https://raw.githubusercontent.com/JaeAeich/s3z/main/plots/download.svg" alt="download benchmark" className="w-full dark:hidden" />
+  <img src="https://raw.githubusercontent.com/JaeAeich/s3z/main/plots/download-dark.svg" alt="download benchmark" className="w-full hidden dark:block" />
+</div>
+
+### List
+
+<div className="not-prose my-4 overflow-hidden border border-fd-border">
+  <div className="border-b border-[#c8512a] bg-fd-card px-4 py-2 text-xs font-semibold uppercase tracking-widest text-fd-muted-foreground">List throughput</div>
+  <img src="https://raw.githubusercontent.com/JaeAeich/s3z/main/plots/list.svg" alt="list benchmark" className="w-full dark:hidden" />
+  <img src="https://raw.githubusercontent.com/JaeAeich/s3z/main/plots/list-dark.svg" alt="list benchmark" className="w-full hidden dark:block" />
+</div>
+
+## Reproducing
+
+```bash
+# Start all backends
+docker compose up -d
+
+# Full benchmark
+mise run bench
+
+# Dev benchmark (MinIO only)
+mise run bench:dev
+
+# Generate plots
+mise run bench:plot
+```
+
+Results are saved to `benchmarks/` and plots to `plots/`.

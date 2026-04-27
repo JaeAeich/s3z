@@ -1,0 +1,83 @@
+---
+title: Quick Start
+description: ""
+---
+
+<div className="not-prose -mt-2 mb-4 flex items-center gap-3 text-sm text-fd-muted-foreground">
+  <a href="https://www.npmjs.com/package/@jae_aeich/s3z" className="inline-flex items-center gap-1.5 text-[#c8512a] hover:underline no-underline">
+    <span className="font-mono font-semibold">npm</span> <span>↗</span>
+  </a>
+  <span className="text-fd-border">·</span>
+  <a href="https://github.com/JaeAeich/s3z/tree/main/bindings/node" className="inline-flex items-center gap-1.5 text-[#c8512a] hover:underline no-underline">
+    <span className="font-mono font-semibold">GitHub</span> <span>↗</span>
+  </a>
+</div>
+
+## Install
+
+```package-install
+@jae_aeich/s3z
+```
+
+## Quick start
+
+Create a client — credentials are read from environment variables by
+default:
+
+```typescript
+import { S3Client } from "@jae_aeich/s3z";
+
+const client = await S3Client.create({ region: "us-east-1" });
+```
+
+Upload files or directories. They're walked recursively and uploaded
+in parallel:
+
+```typescript
+const uploaded = await client.upload({
+  sources: ["./data"],
+  bucket: "my-bucket",
+  prefix: "uploads/",
+});
+
+for (const f of uploaded) {
+  console.log(`${f.source} → s3://${f.key} (${f.parts} parts)`);
+}
+```
+
+Download everything under a prefix to a local directory:
+
+```typescript
+const downloaded = await client.download({
+  bucket: "my-bucket",
+  prefix: "uploads/",
+  destDir: "./out",
+});
+```
+
+List objects:
+
+```typescript
+const objects = await client.list({
+  bucket: "my-bucket",
+  prefix: "uploads/",
+});
+
+for (const obj of objects) {
+  console.log(`${obj.key} (${obj.size} bytes)`);
+}
+```
+
+## S3-compatible backends
+
+Pass explicit credentials and a custom `endpoint` for MinIO,
+SeaweedFS, Garage, or any S3-compatible backend:
+
+```typescript
+const client = await S3Client.create({
+  region: "us-east-1",
+  accessKey: "access-key",
+  secretKey: "secret-key",
+  endpoint: "http://localhost:9000",
+});
+```

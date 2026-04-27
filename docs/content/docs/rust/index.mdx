@@ -1,0 +1,95 @@
+---
+title: Quick Start
+description: ""
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+<div className="not-prose -mt-2 mb-4 flex items-center gap-3 text-sm text-fd-muted-foreground">
+  <a href="https://crates.io/crates/s3z" className="inline-flex items-center gap-1.5 text-[#c8512a] hover:underline no-underline">
+    <span className="font-mono font-semibold">crates.io</span> <span>↗</span>
+  </a>
+  <span className="text-fd-border">·</span>
+  <a href="https://docs.rs/s3z" className="inline-flex items-center gap-1.5 text-[#c8512a] hover:underline no-underline">
+    <span className="font-mono font-semibold">docs.rs</span> <span>↗</span>
+  </a>
+  <span className="text-fd-border">·</span>
+  <a href="https://github.com/JaeAeich/s3z/tree/main/crates/core" className="inline-flex items-center gap-1.5 text-[#c8512a] hover:underline no-underline">
+    <span className="font-mono font-semibold">GitHub</span> <span>↗</span>
+  </a>
+</div>
+
+## Install
+
+```bash
+cargo add s3z
+```
+
+## Quick start
+
+Create a client with your region. Credentials are read from `AWS_ACCESS_KEY_ID`
+and `AWS_SECRET_ACCESS_KEY` environment variables:
+
+```rust
+use s3z::{Config, S3Client, auth::CredentialSource};
+
+let client = S3Client::new(
+    Config::new("us-east-1", CredentialSource::Env),
+).await?;
+```
+
+Upload files or directories — walked recursively, uploaded in parallel:
+
+```rust
+use s3z::UploadRequest;
+
+let result = client
+    .upload(UploadRequest::new(vec!["./data".into()], "my-bucket", "uploads/"))
+    .await?;
+
+for f in &result.files {
+    println!("{} → s3://{} ({} parts)", f.source.display(), f.key, f.parts);
+}
+```
+
+Download everything under a prefix:
+
+```rust
+use s3z::DownloadRequest;
+
+let files = client
+    .download(DownloadRequest::new("my-bucket", "uploads/", "./out"))
+    .await?;
+```
+
+List objects:
+
+```rust
+use s3z::ListRequest;
+
+let objects = client
+    .list(ListRequest::new("my-bucket", "uploads/"))
+    .collect_all()
+    .await?;
+```
+
+## S3-compatible backends
+
+```rust
+let config = Config::with_endpoint(
+    "us-east-1",
+    CredentialSource::Static {
+        access_key: "minioadmin".into(),
+        secret_key: "minioadmin".into(),
+    },
+    "http://localhost:9000",
+);
+let client = S3Client::new(config).await?;
+```
+
+## API Reference
+
+<Callout type="info">
+  Full API docs are auto-generated on [docs.rs/s3z](https://docs.rs/s3z).
+  Generate locally with `cargo doc --open -p s3z`.
+</Callout>

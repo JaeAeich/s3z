@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+:root {
+  --s3z-rust: #c8512a;
+  --s3z-rust-deep: #a8401f;
+  --s3z-rust-bright: #e3692f;
+  --s3z-ink: #1a1614;
+  --s3z-ink-soft: #2a2421;
+  --s3z-cream: #f3ede1;
+  --s3z-cream-warm: #ece4d3;
+  --s3z-cream-deep: #e3d9c3;
+
+  /* Fumadocs theme — cream palette */
+  --fd-primary: 18 68% 48%;
+  --fd-background: 34 28% 93%;
+  --fd-foreground: 16 14% 10%;
+  --fd-card: 34 24% 96%;
+  --fd-muted: 30 18% 88%;
+  --fd-muted-foreground: 18 10% 35%;
+  --fd-border: 30 14% 82%;
+  --fd-accent: 18 68% 48%;
+  --fd-accent-foreground: 34 28% 96%;
+}
+
+.dark {
+  --fd-primary: 18 72% 55%;
+  --fd-background: 18 14% 8%;
+  --fd-foreground: 34 24% 92%;
+  --fd-card: 18 12% 12%;
+  --fd-muted: 18 10% 14%;
+  --fd-muted-foreground: 30 14% 62%;
+  --fd-border: 18 10% 20%;
+  --fd-accent: 18 72% 55%;
+  --fd-accent-foreground: 18 14% 8%;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+/* ── Links ── */
+.prose a {
+  text-decoration-color: var(--s3z-rust);
+}
+
+.prose a:hover {
+  color: var(--s3z-rust);
+}
+
+/* ── Sidebar active item ── */
+[aria-current="page"] {
+  border-color: var(--s3z-rust) !important;
+  color: var(--s3z-rust) !important;
+  background: hsl(18 68% 48% / 0.08) !important;
+}
+
+/* ── Code blocks ── */
+[data-rehype-pretty-code-figure] > pre {
+  border-top: 2px solid var(--s3z-rust);
+}
+
+/* ── Tables ── */
+th {
+  border-bottom: 2px solid var(--s3z-rust) !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+/* ── Cards hover accent ── */
+[data-card]:hover,
+a[class*="card"]:hover {
+  border-color: var(--s3z-rust) !important;
+}
+
+/* ── Callout accent ── */
+[data-callout="info"] {
+  border-left-color: var(--s3z-rust) !important;
+}
+
+/* ── Heading anchors ── */
+.prose h2::before {
+  content: "// ";
+  color: var(--s3z-rust);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-style: italic;
+  font-weight: 800;
+}
+
+/* ── Tab active indicator ── */
+[role="tab"][data-state="active"] {
+  border-color: var(--s3z-rust) !important;
+  color: var(--s3z-rust) !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--s3z-rust);
+  border-radius: 0;
+}
