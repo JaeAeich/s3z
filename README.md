@@ -15,16 +15,8 @@ A very lightweight, high-throughput S3 library/client.
 
 ## Install the s3z CLI
 
-On Linux/macOS:
-
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jaeaeich/s3z/releases/latest/download/s3z-cli-installer.sh | sh
-```
-
-On Windows:
-
-```powershell
-irm https://github.com/jaeaeich/s3z/releases/latest/download/s3z-cli-installer.ps1 | iex
 ```
 
 ### Build from source
