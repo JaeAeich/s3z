@@ -59,6 +59,7 @@ pub use ops::{
         ParallelismConfig,
         tune_parallelism,
     },
+    head::{HeadObjectOutput, HeadObjectRequest},
     list::{ListPage, ListPaginator, ListRequest, ObjectInfo},
     upload::{FileUploadResult, UploadRequest, UploadResult},
 };
