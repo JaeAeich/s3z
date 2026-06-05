@@ -388,6 +388,38 @@ pub fn tune_parallelism(objects: &[ObjectInfo], multipart_threshold: u64) -> Par
     }
 }
 
+/// Map an object key to a local path under `dest_dir`.
+///
+/// The key is made relative to `prefix`; if nothing remains (the prefix
+/// names the object itself), the key's last segment is used. Empty and
+/// `.` segments are dropped and `..` is rejected, so the result can never
+/// escape `dest_dir`.
+fn local_path(dest_dir: &Path, prefix: &str, key: &str) -> Result<PathBuf> {
+    let rel = match key.strip_prefix(prefix) {
+        Some("") => key.rsplit('/').next().unwrap_or_default(),
+        Some(rel) => rel,
+        None => key,
+    };
+
+    let mut path = dest_dir.to_path_buf();
+    let mut pushed = false;
+    for segment in rel.split('/') {
+        match segment {
+            "" | "." => {},
+            ".." => return Err(Error::Conversion(format!("unsafe object key: {key}"))),
+            s => {
+                path.push(s);
+                pushed = true;
+            },
+        }
+    }
+
+    if !pushed {
+        return Err(Error::Conversion(format!("object key has no file name: {key}")));
+    }
+    Ok(path)
+}
+
 /// Download a single object — picks single GET or multipart based on size.
 ///
 /// Concurrency is dynamically scaled per file via
@@ -399,8 +431,7 @@ async fn download_single_object(
     http: &reqwest::Client, config: &crate::config::Config, creds: &crate::auth::Credentials,
     bucket: &str, prefix: &str, obj: &ObjectInfo, dest_dir: &Path, _concurrency: usize,
 ) -> Result<FileDownloadResult> {
-    let rel_key = obj.key.strip_prefix(prefix).unwrap_or(&obj.key);
-    let dest = dest_dir.join(rel_key);
+    let dest = local_path(dest_dir, prefix, &obj.key)?;
     let key = ObjectKey::new(&obj.key);
 
     #[cfg(feature = "tracing")]
@@ -533,6 +564,41 @@ mod tests {
         let objects = make_objects(&sizes);
         let cfg = tune_parallelism(&objects, THRESHOLD);
         assert_eq!(cfg.concurrency_per_file, 1);
+    }
+
+    #[test]
+    fn local_path_strips_prefix() {
+        let p = local_path(Path::new("/out"), "data/", "data/a/b.txt").unwrap();
+        assert_eq!(p, Path::new("/out/a/b.txt"));
+    }
+
+    #[test]
+    fn local_path_prefix_without_slash_stays_in_dest() {
+        let p = local_path(Path::new("/out"), "data", "data/f.txt").unwrap();
+        assert_eq!(p, Path::new("/out/f.txt"));
+    }
+
+    #[test]
+    fn local_path_prefix_equals_key_uses_file_name() {
+        let p = local_path(Path::new("/out"), "data/f.txt", "data/f.txt").unwrap();
+        assert_eq!(p, Path::new("/out/f.txt"));
+    }
+
+    #[test]
+    fn local_path_drops_empty_and_dot_segments() {
+        let p = local_path(Path::new("/out"), "", "/a//./b").unwrap();
+        assert_eq!(p, Path::new("/out/a/b"));
+    }
+
+    #[test]
+    fn local_path_rejects_parent_segments() {
+        local_path(Path::new("/out"), "", "a/../../etc/passwd").unwrap_err();
+        local_path(Path::new("/out"), "data/", "data/../x").unwrap_err();
+    }
+
+    #[test]
+    fn local_path_rejects_empty_name() {
+        local_path(Path::new("/out"), "", "./").unwrap_err();
     }
 
     #[test]
