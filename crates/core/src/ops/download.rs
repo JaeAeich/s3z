@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use tokio::sync::mpsc;
+use tokio::{fs, sync::mpsc};
 
 use crate::{
     client::S3Client,
@@ -37,7 +37,7 @@ pub struct FileDownloadResult {
     pub dest: PathBuf,
     /// S3 key that was downloaded.
     pub key: String,
-    /// Number of parts used (1 = single GET).
+    /// Number of parts used (1 = single GET, 0 = directory marker).
     pub parts: u32,
     /// File size in bytes.
     pub size: u64,
@@ -393,7 +393,7 @@ pub fn tune_parallelism(objects: &[ObjectInfo], multipart_threshold: u64) -> Par
 /// The key is made relative to `prefix`; if nothing remains (the prefix
 /// names the object itself), the key's last segment is used. Empty and
 /// `.` segments are dropped and `..` is rejected, so the result can never
-/// escape `dest_dir`.
+/// escape `dest_dir`. Returns `dest_dir` itself if no segments remain.
 fn local_path(dest_dir: &Path, prefix: &str, key: &str) -> Result<PathBuf> {
     let rel = match key.strip_prefix(prefix) {
         Some("") => key.rsplit('/').next().unwrap_or_default(),
@@ -402,20 +402,12 @@ fn local_path(dest_dir: &Path, prefix: &str, key: &str) -> Result<PathBuf> {
     };
 
     let mut path = dest_dir.to_path_buf();
-    let mut pushed = false;
     for segment in rel.split('/') {
         match segment {
             "" | "." => {},
             ".." => return Err(Error::Conversion(format!("unsafe object key: {key}"))),
-            s => {
-                path.push(s);
-                pushed = true;
-            },
+            s => path.push(s),
         }
-    }
-
-    if !pushed {
-        return Err(Error::Conversion(format!("object key has no file name: {key}")));
     }
     Ok(path)
 }
@@ -432,6 +424,23 @@ async fn download_single_object(
     bucket: &str, prefix: &str, obj: &ObjectInfo, dest_dir: &Path, _concurrency: usize,
 ) -> Result<FileDownloadResult> {
     let dest = local_path(dest_dir, prefix, &obj.key)?;
+
+    // Directory marker (e.g. created by the S3 console): mirror it as a
+    // directory instead of trying to write a file at a directory path.
+    if obj.key.ends_with('/') {
+        fs::create_dir_all(&dest).await?;
+        maybe_debug!(key = %obj.key, "directory marker");
+        return Ok(FileDownloadResult {
+            dest,
+            key: obj.key.clone(),
+            parts: 0,
+            size: 0,
+        });
+    }
+    if dest == dest_dir {
+        return Err(Error::Conversion(format!("object key has no file name: {}", obj.key)));
+    }
+
     let key = ObjectKey::new(&obj.key);
 
     #[cfg(feature = "tracing")]
@@ -597,8 +606,15 @@ mod tests {
     }
 
     #[test]
-    fn local_path_rejects_empty_name() {
-        local_path(Path::new("/out"), "", "./").unwrap_err();
+    fn local_path_marker_equal_to_prefix_is_dest_dir() {
+        assert_eq!(local_path(Path::new("/out"), "data/", "data/").unwrap(), Path::new("/out"));
+        assert_eq!(local_path(Path::new("/out"), "data", "data/").unwrap(), Path::new("/out"));
+    }
+
+    #[test]
+    fn local_path_nested_marker() {
+        let p = local_path(Path::new("/out"), "data/", "data/sub/").unwrap();
+        assert_eq!(p, Path::new("/out/sub"));
     }
 
     #[test]
