@@ -103,8 +103,11 @@ struct WriteCmd {
 /// Handle to the dedicated writer thread. Async tasks send [`WriteCmd`]s
 /// through the bounded channel; the thread does `pwrite` without touching
 /// the tokio runtime. Dropped senders signal the thread to flush and exit.
+///
+/// The channel is a tokio channel so a full queue suspends the sending
+/// task instead of blocking a runtime worker thread.
 struct DiskWriter {
-    tx: std::sync::mpsc::SyncSender<WriteCmd>,
+    tx: mpsc::Sender<WriteCmd>,
     handle: Option<std::thread::JoinHandle<std::io::Result<()>>>,
 }
 
@@ -112,9 +115,9 @@ impl DiskWriter {
     /// Spawn a writer thread for `fd`. `capacity` bounds the channel
     /// (backpressure: async tasks block when the writer can't keep up).
     fn spawn(fd: Arc<std::fs::File>, capacity: usize) -> Self {
-        let (tx, rx) = std::sync::mpsc::sync_channel::<WriteCmd>(capacity);
+        let (tx, mut rx) = mpsc::channel::<WriteCmd>(capacity);
         let handle = std::thread::spawn(move || {
-            while let Ok(cmd) = rx.recv() {
+            while let Some(cmd) = rx.blocking_recv() {
                 fd.write_all_at(&cmd.buf, cmd.offset)?;
             }
             fd.sync_all()
@@ -128,10 +131,13 @@ impl DiskWriter {
     /// Wait for the writer thread to finish and propagate any I/O error.
     ///
     /// All other sender clones (in `DownloadCtx`) must be dropped before
-    /// calling this so the writer's `recv()` loop can exit.
+    /// calling this so the writer's `blocking_recv()` loop can exit.
+    ///
+    /// Blocks on the join (which includes `sync_all`), so call it from
+    /// a blocking context.
     fn finish(self) -> Result<()> {
         // Drop our sender — if all other clones are already dropped,
-        // this unblocks the writer thread's recv() loop.
+        // this unblocks the writer thread's blocking_recv() loop.
         drop(self.tx);
         if let Some(h) = self.handle {
             h.join()
@@ -150,7 +156,7 @@ struct DownloadCtx {
     http: reqwest::Client,
     key: ObjectKey,
     /// Channel to the dedicated writer thread.
-    writer_tx: std::sync::mpsc::SyncSender<WriteCmd>,
+    writer_tx: mpsc::Sender<WriteCmd>,
 }
 
 /// Part job metadata for the download scheduler.
@@ -222,8 +228,10 @@ pub(crate) async fn download_multipart(
 
     match result {
         Ok(()) => {
-            // Wait for writer to flush + sync_all.
-            writer.finish()?;
+            // Wait for writer to flush + sync_all off the async runtime.
+            task::spawn_blocking(move || writer.finish())
+                .await
+                .map_err(|e| Error::Internal(e.to_string()))??;
 
             let dest = dest.to_owned();
             task::spawn_blocking(move || tmp.persist(dest).map_err(|e| Error::Io(e.error)))
@@ -362,6 +370,7 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
                 buf: data,
                 offset: write_offset,
             })
+            .await
             .map_err(|_| Error::Internal("writer thread exited early".into()))?;
             #[expect(clippy::arithmetic_side_effects, reason = "write_offset bounded by file size")]
             {
@@ -376,6 +385,7 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
             buf,
             offset: write_offset,
         })
+        .await
         .map_err(|_| Error::Internal("writer thread exited early".into()))?;
     }
 
@@ -384,6 +394,66 @@ async fn download_part(ctx: &DownloadCtx, job: DownloadPartJob) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+
+    use super::*;
+    use crate::auth::CredentialSource;
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn multipart_download_reassembles_ranges() {
+        const SIZE: usize = 3 * WRITE_BUF_SIZE + 123;
+        let data: Vec<u8> = (0..SIZE).map(|i| u8::try_from(i % 251).unwrap()).collect();
+
+        let server = MockServer::start().await;
+        let body = data.clone();
+        Mock::given(method("GET"))
+            .respond_with(move |req: &wiremock::Request| {
+                let range = req.headers.get("range").unwrap().to_str().unwrap();
+                let (start, end) = range.trim_start_matches("bytes=").split_once('-').unwrap();
+                let (start, end): (usize, usize) = (start.parse().unwrap(), end.parse().unwrap());
+                ResponseTemplate::new(206).set_body_bytes(body[start..=end].to_vec())
+            })
+            .mount(&server)
+            .await;
+
+        let config = Config::with_endpoint(
+            "us-east-1",
+            CredentialSource::Static {
+                access_key: "AKID".into(),
+                secret_key: "SECRET".into(),
+            },
+            server.uri(),
+        );
+        let creds = crate::auth::resolve(&config.credentials).unwrap();
+        let part_size = u64::try_from(WRITE_BUF_SIZE + 7).unwrap();
+        let parts = crate::transfer::scheduler::plan_parts(
+            u64::try_from(SIZE).unwrap(),
+            &crate::config::TransferConfig {
+                part_size,
+                ..config.transfer
+            },
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("out.bin");
+        let written = download_multipart(
+            &reqwest::Client::new(),
+            &config,
+            &creds,
+            "bucket",
+            &ObjectKey::new("key"),
+            &parts,
+            &dest,
+            u64::try_from(SIZE).unwrap(),
+            2,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(written, u64::try_from(SIZE).unwrap());
+        assert_eq!(std::fs::read(&dest).unwrap(), data);
+    }
+
     #[test]
     fn tempfile_creates_in_target_dir() {
         let dir = std::env::temp_dir();
