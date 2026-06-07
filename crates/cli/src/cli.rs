@@ -22,7 +22,7 @@ pub(crate) struct Cli {
     pub access_key: Option<String>,
 
     /// AWS secret access key. Falls back to `AWS_SECRET_ACCESS_KEY` env var.
-    #[arg(long, global = true, env = "AWS_SECRET_ACCESS_KEY")]
+    #[arg(long, global = true, env = "AWS_SECRET_ACCESS_KEY", hide_env_values = true)]
     pub secret_key: Option<String>,
 
     /// AWS session token for temporary credentials. Falls back to
