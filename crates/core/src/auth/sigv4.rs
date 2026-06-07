@@ -34,7 +34,13 @@ pub(crate) fn sign_request(
     request: &mut http::Request<bytes::Bytes>, creds: &Credentials, region: &str,
     unsigned_payload: bool,
 ) -> Result<()> {
-    let aws_creds = AwsCreds::new(&creds.access_key, &creds.secret_key, None, None, "s3z");
+    let aws_creds = AwsCreds::new(
+        &creds.access_key,
+        &creds.secret_key,
+        creds.session_token.clone(),
+        None,
+        "s3z",
+    );
 
     let mut settings = SigningSettings::default();
     settings.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
@@ -81,4 +87,34 @@ pub(crate) fn sign_request(
     instructions.apply_to_request_http1x(request);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn signed_headers(session_token: Option<&str>) -> http::HeaderMap {
+        let creds = Credentials {
+            access_key: "AKID".into(),
+            secret_key: "SECRET".into(),
+            session_token: session_token.map(String::from),
+        };
+        let mut req = http::Request::builder()
+            .uri("https://s3.us-east-1.amazonaws.com/bucket/key")
+            .body(bytes::Bytes::new())
+            .unwrap();
+        sign_request(&mut req, &creds, "us-east-1", false).unwrap();
+        req.headers().clone()
+    }
+
+    #[test]
+    fn session_token_sent_as_security_token_header() {
+        let headers = signed_headers(Some("TOKEN"));
+        assert_eq!(headers.get("x-amz-security-token").unwrap(), "TOKEN");
+    }
+
+    #[test]
+    fn no_security_token_header_without_session_token() {
+        assert!(signed_headers(None).get("x-amz-security-token").is_none());
+    }
 }

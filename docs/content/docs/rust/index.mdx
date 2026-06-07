@@ -32,7 +32,7 @@ cargo add s3z
 ## Quick start
 
 Create a client with your region. Credentials are read from `AWS_ACCESS_KEY_ID`
-and `AWS_SECRET_ACCESS_KEY` environment variables:
+and `AWS_SECRET_ACCESS_KEY` environment variables (plus `AWS_SESSION_TOKEN` if set):
 
 ```rust
 use s3z::{Config, S3Client, auth::CredentialSource};
