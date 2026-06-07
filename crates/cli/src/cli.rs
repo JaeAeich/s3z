@@ -25,6 +25,11 @@ pub(crate) struct Cli {
     #[arg(long, global = true, env = "AWS_SECRET_ACCESS_KEY")]
     pub secret_key: Option<String>,
 
+    /// AWS session token for temporary credentials. Falls back to
+    /// `AWS_SESSION_TOKEN` env var.
+    #[arg(long, global = true, env = "AWS_SESSION_TOKEN", hide_env_values = true)]
+    pub session_token: Option<String>,
+
     /// Suppress all output except errors.
     #[arg(short, long, global = true, default_value_t = false)]
     pub quiet: bool,
@@ -107,8 +112,15 @@ pub(crate) struct UploadArgs {
 
 /// Build an [`s3z::Config`] from the global CLI options.
 pub(crate) fn build_config(cli: &Cli) -> Config {
-    let creds = match (&cli.access_key, &cli.secret_key) {
-        (Some(ak), Some(sk)) => {
+    let creds = match (&cli.access_key, &cli.secret_key, &cli.session_token) {
+        (Some(ak), Some(sk), Some(token)) if !token.is_empty() => {
+            CredentialSource::Session {
+                access_key: ak.clone(),
+                secret_key: sk.clone(),
+                session_token: token.clone(),
+            }
+        },
+        (Some(ak), Some(sk), _) => {
             CredentialSource::Static {
                 access_key: ak.clone(),
                 secret_key: sk.clone(),
