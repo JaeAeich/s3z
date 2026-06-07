@@ -1,8 +1,9 @@
 //! Python bindings for s3z.
 //!
 //! Exposes the core s3z library to Python via `PyO3`. All async operations
-//! are run on a shared tokio runtime, blocking the Python thread until
-//! completion. For true async Python usage, call these from a thread pool.
+//! are run on a shared tokio runtime, blocking the calling Python thread
+//! until completion. The GIL is released while blocked, so other Python
+//! threads keep running; for concurrent calls, use a thread pool.
 
 use std::path::PathBuf;
 
@@ -23,6 +24,15 @@ fn runtime() -> &'static tokio::runtime::Runtime {
             .build()
             .expect("failed to build tokio runtime")
     })
+}
+
+/// Run `fut` on the shared runtime with the GIL released.
+fn block_on<F>(py: Python<'_>, fut: F) -> F::Output
+where
+    F: Future + Send,
+    F::Output: Send,
+{
+    py.detach(|| runtime().block_on(fut))
 }
 
 /// How to obtain AWS credentials.
@@ -131,10 +141,9 @@ struct PyS3Client {
 impl PyS3Client {
     /// Create a new client with the given config.
     #[new]
-    fn new(config: &PyConfig) -> PyResult<Self> {
-        let client = runtime()
-            .block_on(s3z::S3Client::new(config.inner.clone()))
-            .map_err(|ref e| to_py_err(e))?;
+    fn new(py: Python<'_>, config: &PyConfig) -> PyResult<Self> {
+        let client =
+            block_on(py, s3z::S3Client::new(config.inner.clone())).map_err(|ref e| to_py_err(e))?;
         Ok(Self {
             inner: client,
         })
@@ -143,8 +152,8 @@ impl PyS3Client {
     /// Upload files/directories to S3.
     #[pyo3(signature = (sources, bucket, prefix, workers=None, concurrency_per_file=None))]
     fn upload(
-        &self, sources: &Bound<'_, PyList>, bucket: &str, prefix: &str, workers: Option<usize>,
-        concurrency_per_file: Option<usize>,
+        &self, py: Python<'_>, sources: &Bound<'_, PyList>, bucket: &str, prefix: &str,
+        workers: Option<usize>, concurrency_per_file: Option<usize>,
     ) -> PyResult<Vec<PyFileUploadResult>> {
         let paths: Vec<PathBuf> = sources
             .iter()
@@ -159,7 +168,7 @@ impl PyS3Client {
             req.concurrency_per_file = c;
         }
 
-        let result = runtime().block_on(self.inner.upload(req)).map_err(|ref e| to_py_err(e))?;
+        let result = block_on(py, self.inner.upload(req)).map_err(|ref e| to_py_err(e))?;
 
         Ok(result
             .files
@@ -179,7 +188,7 @@ impl PyS3Client {
     /// Download objects under a prefix to a local directory.
     #[pyo3(signature = (bucket, prefix, dest_dir, workers=None, concurrency_per_file=None))]
     fn download(
-        &self, bucket: &str, prefix: &str, dest_dir: &str, workers: Option<usize>,
+        &self, py: Python<'_>, bucket: &str, prefix: &str, dest_dir: &str, workers: Option<usize>,
         concurrency_per_file: Option<usize>,
     ) -> PyResult<Vec<PyFileDownloadResult>> {
         let mut req = s3z::DownloadRequest::new(bucket, prefix, dest_dir);
@@ -190,7 +199,7 @@ impl PyS3Client {
             req.concurrency_per_file = c;
         }
 
-        let result = runtime().block_on(self.inner.download(req)).map_err(|ref e| to_py_err(e))?;
+        let result = block_on(py, self.inner.download(req)).map_err(|ref e| to_py_err(e))?;
 
         Ok(result
             .files
@@ -209,7 +218,7 @@ impl PyS3Client {
     /// List objects under a prefix.
     #[pyo3(signature = (bucket, prefix, delimiter=None))]
     fn list(
-        &self, bucket: &str, prefix: &str, delimiter: Option<String>,
+        &self, py: Python<'_>, bucket: &str, prefix: &str, delimiter: Option<String>,
     ) -> PyResult<Vec<PyObjectInfo>> {
         let mut req = s3z::ListRequest::new(bucket, prefix);
         if let Some(d) = delimiter {
@@ -217,7 +226,7 @@ impl PyS3Client {
         }
 
         let mut paginator = self.inner.list(req);
-        let objects = runtime().block_on(paginator.collect_all()).map_err(|ref e| to_py_err(e))?;
+        let objects = block_on(py, paginator.collect_all()).map_err(|ref e| to_py_err(e))?;
 
         Ok(objects
             .into_iter()
