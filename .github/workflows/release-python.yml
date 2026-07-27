@@ -63,7 +63,7 @@ jobs:
             manylinux: "2_28"
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Patch version for pre-release
@@ -96,7 +96,7 @@ jobs:
             target: aarch64
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Patch version for pre-release
