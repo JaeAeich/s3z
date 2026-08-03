@@ -39,7 +39,7 @@ jobs:
           node-version: 22
 
       - name: Install tools
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: cargo-edit,git-cliff
 
