@@ -106,7 +106,7 @@ jobs:
 
       - name: Install cargo-zigbuild
         if: ${{ matrix.settings.use-zig }}
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
