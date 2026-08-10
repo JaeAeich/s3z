@@ -10,7 +10,7 @@
     "url": "https://github.com/JaeAeich/s3z"
   },
   "devDependencies": {
-    "@napi-rs/cli": "3.6.2"
+    "@napi-rs/cli": "3.8.2"
   },
   "napi": {
     "binaryName": "s3z",
