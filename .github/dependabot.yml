@@ -1,9 +1,19 @@
 version: 2
+
 updates:
   - package-ecosystem: "cargo"
-    directory: "/"
+    directories: ["/", "/bindings", "/examples/rust"]
     schedule:
       interval: "weekly"
+    # One grouped PR per ecosystem for minor/patch bumps and one for security
+    # fixes; major bumps stay as individual PRs since they may need code changes.
+    # Reused below via the `*groups` alias.
+    groups: &groups
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
     commit-message:
       prefix: "chore(deps)"
     labels:
@@ -13,15 +23,41 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups: *groups
+    ignore:
+      # Referenced as @v2, which already tracks the latest 2.x release.
+      - dependency-name: "taiki-e/install-action"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
     commit-message:
       prefix: "ci(deps)"
     labels:
       - "dependencies"
 
   - package-ecosystem: "npm"
-    directory: "/bindings/node"
+    directories: ["/bindings/node", "/docs"]
     schedule:
       interval: "weekly"
+    groups: *groups
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "bun"
+    directory: "/examples/typescript"
+    schedule:
+      interval: "weekly"
+    groups: *groups
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "uv"
+    directories: ["/bench", "/examples/python"]
+    schedule:
+      interval: "weekly"
+    groups: *groups
     commit-message:
       prefix: "chore(deps)"
     labels:
@@ -31,6 +67,7 @@ updates:
     directory: "/bindings/python"
     schedule:
       interval: "weekly"
+    groups: *groups
     commit-message:
       prefix: "chore(deps)"
     labels:
