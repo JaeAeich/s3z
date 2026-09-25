@@ -1,4 +1,6 @@
 [dist]
+# release.yml is kept up to date by dependabot; re-run `dist init` after upgrading dist.
+allow-dirty = ["ci"]
 cargo-dist-version = "0.31.0"
 ci = "github"
 hosting = "github"
