@@ -9,7 +9,7 @@ napi-derive = "3"
 pyo3 = { features = [
   "experimental-inspect",
   "extension-module",
-], version = "0.28" }
+], version = "0.29" }
 tokio = { features = [
   "fs",
   "macros",
